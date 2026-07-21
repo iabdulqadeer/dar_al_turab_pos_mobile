@@ -26,18 +26,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    // The emblem is drawn on white, so on a dark surface it needs the
+    // mono-white variant or the black arcs and wordmark vanish.
+    final onDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.storefront_outlined,
-              size: 56,
-              color: AppColors.primary,
+            Image.asset(
+              onDark
+                  ? 'assets/brand/logo_mono_light.png'
+                  : 'assets/brand/logo.png',
+              width: 200,
+              // The launcher already showed the mark; if the asset is missing
+              // the app should still boot rather than throw on a grey screen.
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.storefront_outlined,
+                size: 56,
+                color: AppColors.primary,
+              ),
             ),
-            SizedBox(height: AppSpacing.lg),
-            SizedBox(
+            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(
               height: 24,
               width: 24,
               child: CircularProgressIndicator(strokeWidth: 2),

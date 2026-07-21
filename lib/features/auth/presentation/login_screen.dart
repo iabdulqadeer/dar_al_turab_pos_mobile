@@ -255,34 +255,32 @@ class _Brand extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // The emblem carries the company name already, so repeating it as a
+    // headline underneath would say the same thing twice.
+    final onDark = theme.brightness == Brightness.dark;
+
     return Column(
       children: [
-        Container(
-          height: 72,
-          width: 72,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.secondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        Image.asset(
+          onDark
+              ? 'assets/brand/logo_mono_light.png'
+              : 'assets/brand/logo.png',
+          width: 190,
+          errorBuilder: (_, _, _) => Container(
+            height: 72,
+            width: 72,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-          ),
-          child: const Icon(
-            Icons.storefront_outlined,
-            color: Colors.white,
-            size: 36,
+            child: const Icon(
+              Icons.storefront_outlined,
+              color: Colors.white,
+              size: 36,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
-        Text(
-          AppConfig.appName,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
         Text(
           'Sign in to continue',
           style: theme.textTheme.bodyMedium?.copyWith(
