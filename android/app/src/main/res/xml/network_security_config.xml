@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The POS server is a WAMP instance on the shop's local network, reached over
+  plain HTTP, and its IP is configured by the user at runtime (Server settings
+  on the login screen). Because the host is not known at build time, cleartext
+  cannot be scoped to specific domains here - Android matches this file by
+  hostname, not by IP range, so a CIDR-style entry would never match.
+
+  Consequence: cleartext is permitted for any host. This is acceptable only
+  while the API stays on a trusted LAN. Before exposing the server beyond the
+  shop network, terminate TLS in front of Laravel and set
+  cleartextTrafficPermitted="false" here.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
+</network-security-config>

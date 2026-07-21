@@ -1,0 +1,310 @@
+import 'package:dar_al_turab_pos/data/models/catalogue.dart';
+import 'package:dar_al_turab_pos/data/models/sale.dart';
+import 'package:dar_al_turab_pos/features/pos/domain/cart.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+CatalogueProduct product({
+  double price = 10,
+  double taxRate = 5,
+  String taxMethod = 'exclusive',
+  double stock = 100,
+  double perPieceGross = 0,
+  double perPieceWaste = 0,
+}) {
+  return CatalogueProduct(
+    id: 1,
+    name: 'Test Product',
+    code: 'TP1',
+    unit: const SaleUnit(id: 4, name: 'KG'),
+    pricing: ProductPricing(
+      basePrice: price,
+      resolvedPrice: price,
+      taxRate: taxRate,
+      taxMethod: taxMethod,
+    ),
+    stock: stock,
+    perPieceGrossWeight: perPieceGross,
+    perPieceWaste: perPieceWaste,
+  );
+}
+
+void main() {
+  group('CartLine tax and subtotal', () {
+    test('adds exclusive tax on top of price x qty', () {
+      final line = CartLine.fromProduct(product())..qty = 10;
+
+      // 10 x 10 = 100, +5% = 5
+      expect(line.tax, 5);
+      expect(line.subtotal, 105);
+    });
+
+    test('extracts inclusive tax from a price that already contains it', () {
+      final line = CartLine.fromProduct(
+        product(price: 10.5, taxMethod: 'inclusive'),
+      )..qty = 10;
+
+      // 10.50 inclusive of 5%: net 10.00, so tax is 0.50 per unit.
+      expect(line.tax, closeTo(5.0, 0.01));
+      expect(line.subtotal, closeTo(105.0, 0.01));
+    });
+
+    test('is tax-free when the rate is zero', () {
+      final line = CartLine.fromProduct(product(taxRate: 0))..qty = 3;
+
+      expect(line.tax, 0);
+      expect(line.subtotal, 30);
+    });
+  });
+
+  group('CartLine weight derivation', () {
+    test('derives gross, waste and net from a piece count', () {
+      // Per-piece values are in GRAMS, so 10 pieces at 250g gross and 15g
+      // waste give 2.5kg gross, 0.15kg waste, 2.35kg net.
+      final line = CartLine.fromProduct(
+        product(perPieceGross: 250, perPieceWaste: 15),
+      );
+
+      line.applyPieceCount(
+        10,
+        perPieceGrossWeightGrams: 250,
+        perPieceWasteGrams: 15,
+      );
+
+      expect(line.noOfPcs, 10);
+      expect(line.grossWeight, 2.5);
+      expect(line.wasteQty, 0.15);
+      expect(line.qty, 2.35);
+    });
+
+    test('keeps waste as the difference when weights are edited by hand', () {
+      final line = CartLine.fromProduct(product())
+        ..grossWeight = 10
+        ..qty = 9.4;
+
+      line.syncWasteFromWeights();
+
+      expect(line.wasteQty, closeTo(0.6, 0.001));
+    });
+  });
+
+  group('CartLine.fromSaleItem', () {
+    final item = SaleItem.fromJson({
+      'id': 42,
+      'product_id': 7,
+      'product_name': 'BEEF LIVER',
+      'product_code': 'BFL001',
+      'qty': 12.5,
+      'no_of_pcs': 5,
+      'gross_weight': 13,
+      'waste_qty': 0.5,
+      'sale_unit': 'KG',
+      'net_unit_price': 20,
+      'tax_rate': 5,
+      'discount': 0,
+    });
+
+    test('carries the line id so an edit updates in place', () {
+      // PUT /sales/{id} matches lines by id; losing it would delete and
+      // re-insert the row.
+      expect(CartLine.fromSaleItem(item).id, 42);
+    });
+
+    test('restores quantities, weights and price', () {
+      final line = CartLine.fromSaleItem(item);
+
+      expect(line.qty, 12.5);
+      expect(line.noOfPcs, 5);
+      expect(line.grossWeight, 13);
+      expect(line.wasteQty, 0.5);
+      expect(line.unitPrice, 20);
+      expect(line.unit?.name, 'KG');
+    });
+
+    test('does not flag an existing line as over-stock', () {
+      // A sale line carries no stock figure. Seeding stock with the line's own
+      // quantity avoids every line on an edited sale showing a false warning.
+      expect(CartLine.fromSaleItem(item).exceedsStock, isFalse);
+    });
+
+    test('honours a real stock figure when one is supplied', () {
+      final line = CartLine.fromSaleItem(item, stockOverride: 5);
+
+      expect(line.exceedsStock, isTrue);
+    });
+
+    test('survives round-tripping through copy()', () {
+      final copy = CartLine.fromSaleItem(item).copy();
+
+      expect(copy.id, 42);
+      expect(copy.qty, 12.5);
+    });
+  });
+
+  group('Cart totals', () {
+    Cart cartWith(List<CartLine> lines) => Cart(
+      lines: lines,
+      customer: const CatalogueCustomer(id: 1, name: 'Walk in'),
+      biller: const NamedRef(id: 1, name: 'Biller'),
+      removeDecimalAmount: false,
+    );
+
+    test('sums line subtotals', () {
+      final cart = cartWith([
+        CartLine.fromProduct(product())..qty = 10, // 105
+        CartLine.fromProduct(product())..qty = 5, // 52.50
+      ]);
+
+      expect(cart.subtotal, closeTo(157.5, 0.01));
+      expect(cart.grandTotal, closeTo(157.5, 0.01));
+    });
+
+    test('adds shipping and subtracts order discount', () {
+      final cart = cartWith([CartLine.fromProduct(product())..qty = 10])
+        ..shippingCost = 10
+        ..orderDiscount = 5;
+
+      expect(cart.grandTotal, closeTo(110, 0.01));
+    });
+
+    test('floors the grand total when remove_decimal_amount is set', () {
+      final cart = Cart(
+        lines: [CartLine.fromProduct(product(price: 10.07))..qty = 10],
+        removeDecimalAmount: true,
+      );
+
+      // 100.70 + 5% = 105.735 -> floored to 105
+      expect(cart.grandTotal, 105);
+    });
+
+    test('never goes negative on an oversized discount', () {
+      final cart = cartWith([CartLine.fromProduct(product())..qty = 1])
+        ..orderDiscount = 9999;
+
+      expect(cart.grandTotal, 0);
+    });
+  });
+
+  group('Cart validation', () {
+    test('rejects an empty basket', () {
+      expect(Cart(lines: []).validationError, isNotNull);
+    });
+
+    test('requires a customer and a biller', () {
+      final noCustomer = Cart(
+        lines: [CartLine.fromProduct(product())],
+        biller: const NamedRef(id: 1, name: 'B'),
+      );
+      expect(noCustomer.validationError, contains('customer'));
+
+      final noBiller = Cart(
+        lines: [CartLine.fromProduct(product())],
+        customer: const CatalogueCustomer(id: 1, name: 'C'),
+      );
+      expect(noBiller.validationError, contains('biller'));
+    });
+
+    test('accepts a complete basket', () {
+      final cart = Cart(
+        lines: [CartLine.fromProduct(product())],
+        customer: const CatalogueCustomer(id: 1, name: 'C'),
+        biller: const NamedRef(id: 1, name: 'B'),
+      );
+
+      expect(cart.validationError, isNull);
+    });
+  });
+
+  group('Cart.toCreateJson', () {
+    Cart full() => Cart(
+      lines: [CartLine.fromProduct(product())..qty = 10],
+      customer: const CatalogueCustomer(id: 3, name: 'C'),
+      biller: const NamedRef(id: 4, name: 'B'),
+      removeDecimalAmount: false,
+    );
+
+    test('sends the unit NAME, which is what the API matches on', () {
+      // sale_unit is a name string; an unknown one is rejected with
+      // UNKNOWN_SALE_UNIT.
+      final json = full().toCreateJson(saleStatus: 1, paymentStatus: 4);
+
+      expect(json['items'][0]['sale_unit'], 'KG');
+    });
+
+    test('omits the payment block when nothing was paid', () {
+      final json = full().toCreateJson(saleStatus: 1, paymentStatus: 2);
+
+      expect(json.containsKey('payment'), isFalse);
+    });
+
+    test('includes the payment block when money changed hands', () {
+      final json = full().toCreateJson(
+        saleStatus: 1,
+        paymentStatus: 4,
+        paidAmount: 105,
+        paymentMethodId: 1,
+      );
+
+      expect(json['payment']['paid_by_id'], 1);
+      expect(json['payment']['paid_amount'], 105);
+    });
+
+    test('omits line ids, since a create has none', () {
+      final json = full().toCreateJson(saleStatus: 1, paymentStatus: 4);
+
+      expect(json['items'][0].containsKey('id'), isFalse);
+    });
+  });
+
+  group('Cart.toUpdateJson', () {
+    test('carries ids for existing lines and omits them for new ones', () {
+      final existing = SaleItem.fromJson({
+        'id': 42,
+        'product_id': 7,
+        'product_name': 'Existing',
+        'qty': 2,
+        'sale_unit': 'KG',
+        'net_unit_price': 10,
+      });
+
+      final cart = Cart(
+        lines: [
+          CartLine.fromSaleItem(existing),
+          CartLine.fromProduct(product()), // newly added, no id
+        ],
+        customer: const CatalogueCustomer(id: 3, name: 'C'),
+        biller: const NamedRef(id: 4, name: 'B'),
+      );
+
+      final json = cart.toUpdateJson(
+        saleStatus: 1,
+        paymentStatus: 4,
+        paidAmount: 0,
+      );
+
+      expect(json['items'][0]['id'], 42);
+      expect(json['items'][1].containsKey('id'), isFalse);
+    });
+
+    test('omits fields the update endpoint does not accept', () {
+      // PUT /sales/{id} takes no warehouse_id, is_pos, reference_no or
+      // payment block — sending them would be rejected or silently ignored.
+      final cart = Cart(
+        lines: [CartLine.fromProduct(product())],
+        customer: const CatalogueCustomer(id: 3, name: 'C'),
+        biller: const NamedRef(id: 4, name: 'B'),
+      );
+
+      final json = cart.toUpdateJson(
+        saleStatus: 1,
+        paymentStatus: 4,
+        paidAmount: 50,
+      );
+
+      expect(json.containsKey('payment'), isFalse);
+      expect(json.containsKey('warehouse_id'), isFalse);
+      expect(json.containsKey('is_pos'), isFalse);
+      expect(json.containsKey('reference_no'), isFalse);
+      expect(json['paid_amount'], 50);
+    });
+  });
+}
