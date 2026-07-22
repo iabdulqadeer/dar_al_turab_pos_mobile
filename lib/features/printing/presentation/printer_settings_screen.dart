@@ -21,6 +21,7 @@ class _PrinterSettingsScreenState
     extends ConsumerState<PrinterSettingsScreen> {
   List<DiscoveredPrinter> _discovered = const [];
   bool _scanning = false;
+  bool _showAll = false;
 
   @override
   void initState() {
@@ -84,13 +85,30 @@ class _PrinterSettingsScreenState
                   'Pair the PM400 in your phone\'s Bluetooth settings first, '
                   'then refresh this list.',
             ),
-            const SizedBox(height: AppSpacing.md),
+
+            // Printers are shown by default; other paired devices (earbuds,
+            // phones) are hidden unless the user asks for them.
+            SwitchListTile(
+              value: _showAll,
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.devices_other_outlined),
+              title: const Text('Show all paired devices'),
+              subtitle: const Text('Include non-printer Bluetooth devices'),
+              onChanged: (value) {
+                setState(() => _showAll = value);
+                _scan();
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
 
             if (_discovered.isEmpty && !_scanning)
               _Notice(
                 icon: Icons.bluetooth_disabled,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
-                message: 'No paired printers found.',
+                message: _showAll
+                    ? 'No paired devices found.'
+                    : 'No paired printers found. Turn on "Show all paired '
+                          'devices" if your printer is missing.',
               )
             else
               for (final printer in _discovered)
@@ -136,7 +154,7 @@ class _PrinterSettingsScreenState
     try {
       final printers = await ref
           .read(printerControllerProvider.notifier)
-          .discover();
+          .discover(includeAll: _showAll);
       if (mounted) setState(() => _discovered = printers);
     } on PrintException catch (e) {
       if (mounted) _showMessage('${e.message} ${e.remedy}', isError: true);

@@ -193,4 +193,59 @@ void main() {
       );
     });
   });
+
+  group('layoutLine centring', () {
+    test('left lines get exactly the left margin, no trailing pad', () {
+      expect(
+        EscPosEncoder.layoutLine('Hi', ReceiptAlign.left, 20, 3),
+        '   Hi',
+      );
+    });
+
+    test('centres within the content width, then applies the margin', () {
+      // slack = 20 - 4 = 16, half = 8, plus a 3-space margin.
+      expect(
+        EscPosEncoder.layoutLine('ABCD', ReceiptAlign.center, 20, 3),
+        '${' ' * 3}${' ' * 8}ABCD',
+      );
+    });
+
+    test('right lines fill the content width before the text', () {
+      // slack = 20 - 4 = 16, all leading, plus the margin.
+      expect(
+        EscPosEncoder.layoutLine('ABCD', ReceiptAlign.right, 20, 3),
+        '${' ' * 3}${' ' * 16}ABCD',
+      );
+    });
+
+    test('a line already at content width still gets its margin', () {
+      final line = EscPosEncoder.layoutLine('X' * 20, ReceiptAlign.left, 20, 4);
+      expect(line, '${' ' * 4}${'X' * 20}');
+    });
+
+    test('encode in centred mode shifts and left-aligns every line', () {
+      final bytes = const EscPosEncoder().encode(
+        [
+          const ReceiptLine(text: 'Title', align: ReceiptAlign.center),
+          const ReceiptLine(text: 'Left'),
+        ],
+        contentWidth: 20,
+        leftMargin: 2,
+      );
+
+      // Both lines are emitted left-aligned (ESC a 0); no centre command.
+      expect(containsSequence(bytes, [0x1B, 0x61, 0x01]), isFalse);
+      // The centred title text (with its baked leading spaces) is present.
+      final centred = EscPosEncoder.layoutLine(
+        'Title',
+        ReceiptAlign.center,
+        20,
+        2,
+      );
+      expect(
+        containsSequence(bytes, centred.codeUnits),
+        isTrue,
+      );
+    });
+  });
 }

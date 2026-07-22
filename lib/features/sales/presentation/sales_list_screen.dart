@@ -300,6 +300,20 @@ class _SaleCard extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  Container(
+                    height: 34,
+                    width: 34,
+                    margin: const EdgeInsets.only(right: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: const Icon(
+                      Icons.receipt_long_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
                   Expanded(
                     child: Text(
                       sale.referenceNo,

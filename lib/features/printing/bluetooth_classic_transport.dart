@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
+import 'native_bluetooth.dart';
 import 'printer_transport.dart';
 
 /// Bluetooth Classic (SPP) transport.
@@ -44,13 +45,18 @@ class BluetoothClassicTransport implements PrinterTransport {
     }
   }
 
+  final NativeBluetooth _native = const NativeBluetooth();
+
   /// Returns printers already paired in Android's Bluetooth settings.
   ///
   /// SPP has no discovery step here — the user pairs the PM400 once in system
-  /// settings, and it then appears in this list.
+  /// settings, and it then appears in this list. By default the list is limited
+  /// to printer-class devices (via the OS device class) so earbuds and phones
+  /// don't clutter it; [includeAll] returns every paired device.
   @override
   Future<List<DiscoveredPrinter>> discover({
     Duration timeout = const Duration(seconds: 10),
+    bool includeAll = false,
   }) async {
     _ensureSupported();
 
@@ -61,11 +67,38 @@ class BluetoothClassicTransport implements PrinterTransport {
       );
     }
 
+    // Preferred path: the native channel gives each device's major class, so we
+    // can show printers only. If it is unavailable (permission timing, etc.),
+    // fall back to the plugin's unfiltered list rather than showing nothing.
+    try {
+      final bonded = await _native.bondedDevices().timeout(timeout);
+      final devices = [
+        for (final d in bonded)
+          if (includeAll || d.looksLikePrinter)
+            DiscoveredPrinter(
+              name: d.name,
+              address: d.address,
+              transport: PrinterTransportKind.bluetoothClassic,
+              majorClass: d.majorClass,
+            ),
+      ];
+      // If the class filter hid everything (e.g. a printer with an odd class),
+      // show the full list so the user is never stuck with an empty screen.
+      if (devices.isEmpty && !includeAll && bonded.isNotEmpty) {
+        return _fromPlugin(timeout);
+      }
+      return devices;
+    } on Object {
+      return _fromPlugin(timeout);
+    }
+  }
+
+  /// Fallback listing via the printing plugin (name + MAC only, unfiltered).
+  Future<List<DiscoveredPrinter>> _fromPlugin(Duration timeout) async {
     try {
       final devices = await PrintBluetoothThermal.pairedBluetooths.timeout(
         timeout,
       );
-
       return devices
           .map(
             (device) => DiscoveredPrinter(
@@ -75,8 +108,6 @@ class BluetoothClassicTransport implements PrinterTransport {
             ),
           )
           .toList(growable: false);
-    } on PrintException {
-      rethrow;
     } on Object catch (e) {
       throw PrintException(
         PrintFailure.permissionDenied,
@@ -140,7 +171,7 @@ class BluetoothClassicTransport implements PrinterTransport {
       );
     }
 
-    final ok = await PrintBluetoothThermal.writeBytes(bytes);
+    final ok = await PrintBluetoothThermal.writeBytes(toPluginPayload(bytes));
     if (!ok) {
       // The plugin reports a boolean only, so we cannot tell paper-out from a
       // dropped link here. The PM400 shows the specific fault on its OLED.
@@ -150,6 +181,21 @@ class BluetoothClassicTransport implements PrinterTransport {
       );
     }
   }
+
+  /// Converts the receipt bytes into the exact type the plugin expects.
+  ///
+  /// `print_bluetooth_thermal`'s Android handler does
+  /// `call.arguments as List<Int>`, but Flutter's method-channel codec
+  /// serialises a [Uint8List] as a Java `byte[]`, not a `List`. Passing the
+  /// [Uint8List] straight through throws "byte[] cannot be cast to
+  /// java.util.List" on the native side, which the plugin swallows into a bare
+  /// `false` — indistinguishable from a real write failure, and the cause of
+  /// every "printer rejected the data" error (confirmed on-device via logcat).
+  ///
+  /// A plain growable `List<int>` marshals as a codec LIST, which the cast
+  /// accepts. Kept as a named, testable seam so this never silently regresses
+  /// to a [Uint8List].
+  static List<int> toPluginPayload(Uint8List bytes) => List<int>.from(bytes);
 
   void _ensureSupported() {
     if (!isSupported) {

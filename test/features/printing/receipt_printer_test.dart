@@ -27,6 +27,7 @@ class FakeTransport implements PrinterTransport {
   @override
   Future<List<DiscoveredPrinter>> discover({
     Duration timeout = const Duration(seconds: 10),
+    bool includeAll = false,
   }) async => const [];
 
   @override

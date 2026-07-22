@@ -27,6 +27,7 @@ class SavedPrinter {
     required this.name,
     required this.address,
     required this.charactersPerLine,
+    this.leftMargin = _defaultLeftMargin,
   });
 
   factory SavedPrinter.fromJson(Map<String, dynamic> json) {
@@ -36,21 +37,44 @@ class SavedPrinter {
       charactersPerLine:
           (json['characters_per_line'] as num?)?.toInt() ??
           ReceiptPrinter.pm400CharactersPerLine,
+      leftMargin:
+          (json['left_margin'] as num?)?.toInt() ?? _defaultLeftMargin,
     );
   }
+
+  static const _defaultLeftMargin = 3;
 
   final String name;
   final String address;
 
-  /// Physical width of this printer in characters. Defaults to the PM400's
-  /// 64 at Font A across its 104mm print width.
+  /// Physical width of this printer in characters — the paper's capacity.
+  /// Defaults to the PM400's 64 at Font A across its 104mm print width.
   final int charactersPerLine;
+
+  /// Blank columns kept on each side so the receipt prints as a centred block
+  /// rather than hugging the left edge. Adjustable per printer.
+  final int leftMargin;
+
+  /// Usable width for receipt content: the capacity minus a margin on each
+  /// side. This is the value sent to the server and used to lay lines out.
+  int get contentWidth {
+    final width = charactersPerLine - 2 * leftMargin;
+    return width < 32 ? 32 : width;
+  }
 
   Map<String, dynamic> toJson() => {
     'name': name,
     'address': address,
     'characters_per_line': charactersPerLine,
+    'left_margin': leftMargin,
   };
+
+  SavedPrinter copyWith({int? leftMargin}) => SavedPrinter(
+    name: name,
+    address: address,
+    charactersPerLine: charactersPerLine,
+    leftMargin: leftMargin ?? this.leftMargin,
+  );
 
   DiscoveredPrinter toDiscovered(PrinterTransportKind kind) =>
       DiscoveredPrinter(name: name, address: address, transport: kind);
@@ -113,16 +137,37 @@ class PrinterController extends Notifier<PrinterState> {
         saved: saved,
         isConnected: await _transport.isConnected,
       );
+      // The Bluetooth socket lives in the app process, so closing the app
+      // drops it. Re-establish it on launch so the printer is ready without
+      // the user having to reconnect by hand.
+      await autoReconnect();
     } on Object {
       // A corrupt entry should not block printing setup; drop it.
       await prefs.remove(_prefsKey);
     }
   }
 
-  Future<List<DiscoveredPrinter>> discover() async {
+  /// Best-effort silent reconnect to the saved printer. Safe to call on launch
+  /// and on app resume — it never throws and never surfaces an error, so a
+  /// printer that is off or out of range simply stays Offline in the UI.
+  Future<void> autoReconnect() async {
+    final saved = state.saved;
+    if (saved == null || !_transport.isSupported) return;
+    if (await _transport.isConnected) {
+      state = state.copyWith(isConnected: true);
+      return;
+    }
+    try {
+      await reconnect();
+    } on Object {
+      // Printer off / out of range — leave it Offline, no toast.
+    }
+  }
+
+  Future<List<DiscoveredPrinter>> discover({bool includeAll = false}) async {
     state = state.copyWith(isBusy: true, clearError: true);
     try {
-      return await _transport.discover();
+      return await _transport.discover(includeAll: includeAll);
     } on PrintException catch (e) {
       state = state.copyWith(error: e);
       rethrow;
@@ -176,6 +221,21 @@ class PrinterController extends Notifier<PrinterState> {
       saved.toDiscovered(_transport.kind),
       charactersPerLine: saved.charactersPerLine,
     );
+  }
+
+  /// Persists a new centring margin for the saved printer.
+  Future<void> setLeftMargin(int leftMargin) async {
+    final saved = state.saved;
+    if (saved == null) return;
+
+    final clamped = leftMargin < 0
+        ? 0
+        : (leftMargin > 12 ? 12 : leftMargin);
+    final updated = saved.copyWith(leftMargin: clamped);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, jsonEncode(updated.toJson()));
+    state = state.copyWith(saved: updated);
   }
 
   Future<void> disconnect() async {

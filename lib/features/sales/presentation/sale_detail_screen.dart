@@ -14,6 +14,7 @@ import '../../pos/providers/pos_providers.dart';
 import '../../printing/printer_transport.dart';
 import '../../printing/providers/printer_providers.dart';
 import '../providers/sales_providers.dart';
+import 'receipt_preview_screen.dart';
 import 'widgets/add_payment_sheet.dart';
 import 'widgets/status_chip.dart';
 
@@ -37,6 +38,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
       appBar: AppBar(
         title: const Text('Sale'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.preview_outlined),
+            tooltip: 'Print preview',
+            onPressed: detail.hasValue && !_printing ? _openPreview : null,
+          ),
           IconButton(
             icon: _printing
                 ? const SizedBox(
@@ -204,7 +210,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   void _refreshEverything() {
     ref.invalidate(saleDetailProvider(widget.saleId));
     ref.invalidate(salesListProvider);
-    ref.invalidate(dashboardStatisticsProvider);
+    ref.invalidate(dashboardRecentProvider);
   }
 
   Future<bool> _confirm({
@@ -267,26 +273,24 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
       // stale "connected" flag would otherwise fail mid-print.
       await ref.read(printerControllerProvider.notifier).reconnect();
 
-      final cpl = printerState.saved!.charactersPerLine;
+      final saved = printerState.saved!;
+      // Ask the server to lay the body out at the centred content width, then
+      // print it shifted right by the margin so both sides have room.
       final document = await ref
           .read(salesApiProvider)
-          .receipt(widget.saleId, charactersPerLine: cpl);
+          .receipt(widget.saleId, charactersPerLine: saved.contentWidth);
 
-      final outcome = await ref
+      await ref
           .read(receiptPrinterProvider)
           .printReceipt(
             document,
             copies: _receiptCopies,
-            connectedPrinterCharactersPerLine: cpl,
+            contentWidth: saved.contentWidth,
+            leftMargin: saved.leftMargin,
           );
 
       if (!mounted) return;
-      _showMessage(
-        outcome.hasWarning
-            ? outcome.warning!
-            : 'Receipt sent to ${printerState.saved!.name}.',
-        isError: outcome.hasWarning,
-      );
+      _showMessage('Receipt sent to ${saved.name}.');
     } on PrintException catch (e) {
       if (mounted) _showMessage('${e.message} ${e.remedy}', isError: true);
     } on ApiException catch (e) {
@@ -296,9 +300,23 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     }
   }
 
-  /// The web app printed a Customer Copy and a Company Copy; the API returns
-  /// one copy and leaves the count to the client.
-  static const _receiptCopies = 2;
+  void _openPreview() {
+    final unsupported = ref.read(printingUnsupportedReasonProvider);
+    if (unsupported != null) {
+      _showMessage(unsupported, isError: true);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReceiptPreviewScreen(saleId: widget.saleId),
+      ),
+    );
+  }
+
+  /// One physical print. The server's SaleReceiptFormatter now emits both the
+  /// CUSTOMER COPY and COMPANY COPY (labelled) inside a single lines[] payload,
+  /// so printing more than once would duplicate the pair.
+  static const _receiptCopies = 1;
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context)
@@ -338,6 +356,7 @@ class _DetailBody extends StatelessWidget {
 
         _SectionCard(
           title: 'Items',
+          icon: Icons.inventory_2_outlined,
           child: Column(
             children: [
               for (final item in sale.items) _ItemRow(item: item),
@@ -348,6 +367,7 @@ class _DetailBody extends StatelessWidget {
 
         _SectionCard(
           title: 'Totals',
+          icon: Icons.receipt_long_outlined,
           child: Column(
             children: [
               _TotalRow('Sub Total', sale.totals.subTotal),
@@ -385,6 +405,7 @@ class _DetailBody extends StatelessWidget {
           const SizedBox(height: AppSpacing.md),
           _SectionCard(
             title: 'Payments',
+            icon: Icons.payments_outlined,
             child: Column(
               children: [
                 for (final payment in sale.payments)
@@ -541,10 +562,11 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({required this.title, required this.child, this.icon});
 
   final String title;
   final Widget child;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -556,11 +578,19 @@ class _SectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+            Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: 18, color: AppColors.primary),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.sm),
             child,

@@ -22,9 +22,13 @@ class AppShell extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
 
+    // Only the Dashboard (0) and Sales (1) tabs offer "New sale"; the Printer
+    // and Profile tabs are not places a sale would be started from.
+    final showNewSale = canCreateSale && navigationShell.currentIndex <= 1;
+
     return Scaffold(
       body: navigationShell,
-      floatingActionButton: canCreateSale
+      floatingActionButton: showNewSale
           ? FloatingActionButton.extended(
               onPressed: () => context.push(Routes.pos),
               icon: const Icon(Icons.add_shopping_cart),

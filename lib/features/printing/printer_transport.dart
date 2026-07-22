@@ -6,6 +6,7 @@ class DiscoveredPrinter {
     required this.name,
     required this.address,
     required this.transport,
+    this.majorClass,
   });
 
   final String name;
@@ -13,6 +14,10 @@ class DiscoveredPrinter {
   /// MAC address on Android SPP, or the peripheral UUID on iOS BLE.
   final String address;
   final PrinterTransportKind transport;
+
+  /// Android Bluetooth major device class, when known. Used to keep the
+  /// pairing list to printers by default.
+  final int? majorClass;
 
   @override
   bool operator ==(Object other) =>
@@ -83,9 +88,11 @@ abstract interface class PrinterTransport {
   Future<bool> get isBluetoothOn;
 
   /// Printers already paired at the OS level (Classic), or discovered by
-  /// scanning (BLE).
+  /// scanning (BLE). By default only printer-class devices are returned; pass
+  /// [includeAll] to list every paired device.
   Future<List<DiscoveredPrinter>> discover({
     Duration timeout = const Duration(seconds: 10),
+    bool includeAll = false,
   });
 
   Future<void> connect(DiscoveredPrinter printer);

@@ -279,7 +279,7 @@ final createSaleProvider = Provider<Future<SaleDetail> Function({
 
     // The sales list and dashboard totals are now stale.
     ref.invalidate(salesListProvider);
-    ref.invalidate(dashboardStatisticsProvider);
+    ref.invalidate(dashboardRecentProvider);
 
     return sale;
   };

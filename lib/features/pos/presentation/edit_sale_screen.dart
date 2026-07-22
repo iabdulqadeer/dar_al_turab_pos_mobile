@@ -258,7 +258,7 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
 
       ref.invalidate(saleDetailProvider(widget.saleId));
       ref.invalidate(salesListProvider);
-      ref.invalidate(dashboardStatisticsProvider);
+      ref.invalidate(dashboardRecentProvider);
 
       if (!mounted) return;
       Navigator.of(context).pop();

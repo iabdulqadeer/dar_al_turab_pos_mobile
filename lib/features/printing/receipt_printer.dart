@@ -33,16 +33,18 @@ class ReceiptPrinter {
   /// 64 characters occupy 768 dots and fit with margin to spare.
   static const pm400CharactersPerLine = 64;
 
-  /// Prints [document], optionally more than once.
+  /// Prints [document]'s flat lines, optionally more than once.
   ///
   /// Throws [PrintException] when the receipt cannot be printed at all.
   /// Returns a [PrintOutcome] carrying a warning when it printed but may be
-  /// visually wrong.
+  /// visually wrong. Pass [contentWidth]/[leftMargin] to centre the block.
   Future<PrintOutcome> printReceipt(
     InvoiceDocument document, {
     int copies = 1,
     int? connectedPrinterCharactersPerLine,
     bool printQrCode = true,
+    int contentWidth = 0,
+    int leftMargin = 0,
   }) async {
     if (!document.hasPrintableLines) {
       throw const PrintException(
@@ -52,6 +54,59 @@ class ReceiptPrinter {
       );
     }
 
+    await _printLines(
+      document.lines,
+      copies: copies,
+      contentWidth: contentWidth,
+      leftMargin: leftMargin,
+      qrCode: printQrCode ? document.qrCode : null,
+    );
+
+    return PrintOutcome(
+      copies: copies,
+      warning: _columnWidthWarning(
+        document,
+        connectedPrinterCharactersPerLine,
+      ),
+    );
+  }
+
+  /// Prints the chosen [pages] (Customer / Company copies), each repeated
+  /// [copies] times, as one centred block. Used by the print-preview screen.
+  Future<PrintOutcome> printPages(
+    List<ReceiptPage> pages, {
+    int copies = 1,
+    int contentWidth = 0,
+    int leftMargin = 0,
+    String? qrCode,
+    bool printQrCode = true,
+  }) async {
+    final lines = [for (final page in pages) ...page.lines];
+    if (lines.isEmpty) {
+      throw const PrintException(
+        PrintFailure.unknown,
+        'Nothing selected to print.',
+      );
+    }
+
+    await _printLines(
+      lines,
+      copies: copies,
+      contentWidth: contentWidth,
+      leftMargin: leftMargin,
+      qrCode: printQrCode ? qrCode : null,
+    );
+
+    return PrintOutcome(copies: copies);
+  }
+
+  Future<void> _printLines(
+    List<ReceiptLine> lines, {
+    required int copies,
+    required int contentWidth,
+    required int leftMargin,
+    String? qrCode,
+  }) async {
     if (!await _transport.isConnected) {
       throw const PrintException(
         PrintFailure.notConnected,
@@ -63,7 +118,7 @@ class ReceiptPrinter {
     // mode: the printer does not do contextual shaping, so it would emit
     // disconnected or wrong glyphs. Refuse rather than print a receipt that
     // looks valid but is not.
-    if (EscPosEncoder.containsUnsupportedGlyphs(document.lines)) {
+    if (EscPosEncoder.containsUnsupportedGlyphs(lines)) {
       throw const PrintException(
         PrintFailure.unknown,
         'This receipt contains characters that text-mode printing cannot '
@@ -72,21 +127,18 @@ class ReceiptPrinter {
       );
     }
 
-    final bytes = _encoder.encode(document.lines, copies: copies);
+    final bytes = _encoder.encode(
+      lines,
+      copies: copies,
+      contentWidth: contentWidth,
+      leftMargin: leftMargin,
+    );
     await _transport.write(bytes);
 
-    if (printQrCode && document.hasQrCode) {
+    if (qrCode != null && qrCode.isNotEmpty) {
       // ZATCA QR goes after the text body, matching the web layout's order.
-      await _transport.write(_encoder.encodeQrCode(document.qrCode!));
+      await _transport.write(_encoder.encodeQrCode(qrCode));
     }
-
-    return PrintOutcome(
-      copies: copies,
-      warning: _columnWidthWarning(
-        document,
-        connectedPrinterCharactersPerLine,
-      ),
-    );
   }
 
   /// Detects the server/printer column-width mismatch described in

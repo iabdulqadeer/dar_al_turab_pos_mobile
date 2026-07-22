@@ -22,6 +22,14 @@ class StatusChip extends StatelessWidget {
         PaymentStatus.due || PaymentStatus.pending => AppColors.error,
         null => AppColors.lightTextSecondary,
       },
+      // Icon + colour + label so payment state reads without relying on colour
+      // alone (colour-blind accessibility).
+      icon: switch (status) {
+        PaymentStatus.paid => Icons.check_circle,
+        PaymentStatus.partial => Icons.hourglass_bottom,
+        PaymentStatus.due || PaymentStatus.pending => Icons.error_outline,
+        null => Icons.help_outline,
+      },
     );
   }
 
@@ -33,6 +41,12 @@ class StatusChip extends StatelessWidget {
         SaleStatus.pending => AppColors.warning,
         SaleStatus.draft => AppColors.lightTextSecondary,
         null => AppColors.lightTextSecondary,
+      },
+      icon: switch (status) {
+        SaleStatus.completed => Icons.check_circle_outline,
+        SaleStatus.pending => Icons.schedule,
+        SaleStatus.draft => Icons.edit_note,
+        null => Icons.help_outline,
       },
     );
   }

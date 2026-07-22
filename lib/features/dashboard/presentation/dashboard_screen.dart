@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,7 +12,6 @@ import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../providers/dashboard_providers.dart';
-import 'widgets/stat_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -19,156 +19,50 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final dashboard = ref.watch(dashboardProvider);
+    final recent = ref.watch(dashboardRecentProvider);
+    final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
 
     return Scaffold(
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
-          onRefresh: () async => ref.invalidate(dashboardProvider),
-          child: CustomScrollView(
+          onRefresh: () async => ref.invalidate(dashboardRecentProvider),
+          child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(child: _Greeting(user: user)),
-              ...switch (dashboard) {
-                AsyncData(:final value) => _content(context, ref, value),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            children: [
+              _Greeting(user: user),
+              _QuickMenu(canCreateSale: canCreateSale),
+              _RecentHeader(),
+              ...switch (recent) {
+                AsyncData(:final value) => [
+                  if (value.isEmpty)
+                    const _NoRecentSales()
+                  else
+                    for (final sale in value)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          0,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                        ),
+                        child: _RecentSaleTile(sale: sale),
+                      ),
+                ],
                 AsyncError(:final error) => [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _DashboardError(
-                      error: error,
-                      onRetry: () => ref.invalidate(dashboardProvider),
-                    ),
+                  _RecentError(
+                    error: error,
+                    onRetry: () => ref.invalidate(dashboardRecentProvider),
                   ),
                 ],
-                _ => const [
-                  SliverToBoxAdapter(child: _DashboardSkeleton()),
-                ],
+                _ => const [_RecentSkeleton()],
               },
             ],
           ),
         ),
       ),
     );
-  }
-
-  List<Widget> _content(
-    BuildContext context,
-    WidgetRef ref,
-    DashboardData data,
-  ) {
-    return [
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          0,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        sliver: SliverGrid.count(
-          crossAxisCount: 2,
-          crossAxisSpacing: AppSpacing.md,
-          mainAxisSpacing: AppSpacing.md,
-          childAspectRatio: 1.45,
-          children: [
-            StatCard(
-              label: 'Sales today',
-              value: Format.amount(data.today.totalGrand),
-              caption: '${data.today.totalCount} invoice'
-                  '${data.today.totalCount == 1 ? '' : 's'}',
-              icon: Icons.today_outlined,
-              accent: AppColors.primary,
-              onTap: () => context.go(Routes.sales),
-            ),
-            StatCard(
-              label: 'Sales this month',
-              value: Format.amount(data.month.totalGrand),
-              caption: '${data.month.totalCount} invoice'
-                  '${data.month.totalCount == 1 ? '' : 's'}',
-              icon: Icons.calendar_month_outlined,
-              accent: AppColors.secondary,
-              onTap: () => context.go(Routes.sales),
-            ),
-            StatCard(
-              label: 'Collected this month',
-              value: Format.amount(data.month.totalPaid),
-              icon: Icons.check_circle_outline,
-              accent: AppColors.success,
-            ),
-            StatCard(
-              label: 'Outstanding',
-              value: Format.amount(data.month.totalDue),
-              caption: data.outstanding.totalCount > 0
-                  ? '${data.outstanding.totalCount} unpaid'
-                  : 'All settled',
-              icon: Icons.error_outline,
-              accent: data.month.totalDue > 0.004
-                  ? AppColors.error
-                  : AppColors.success,
-              onTap: () => context.go(Routes.sales),
-            ),
-          ],
-        ),
-      ),
-
-      SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        sliver: SliverToBoxAdapter(
-          child: CollectionCard(
-            title: 'This month',
-            billed: Format.amount(data.month.totalGrand),
-            collected: Format.amount(data.month.totalPaid),
-            outstanding: Format.amount(data.month.totalDue),
-            rate: data.month.collectionRate,
-          ),
-        ),
-      ),
-
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.sm,
-        ),
-        sliver: SliverToBoxAdapter(
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Recent sales',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.go(Routes.sales),
-                child: const Text('View all'),
-              ),
-            ],
-          ),
-        ),
-      ),
-
-      if (data.recent.isEmpty)
-        const SliverToBoxAdapter(child: _NoRecentSales())
-      else
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            0,
-            AppSpacing.md,
-            AppSpacing.xl,
-          ),
-          sliver: SliverList.separated(
-            itemCount: data.recent.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) =>
-                _RecentSaleTile(sale: data.recent[index]),
-          ),
-        ),
-    ];
   }
 }
 
@@ -239,6 +133,161 @@ class _Greeting extends StatelessWidget {
   }
 }
 
+/// Vertical shortcut list — the salesman's primary actions, one tap each.
+class _QuickMenu extends StatelessWidget {
+  const _QuickMenu({required this.canCreateSale});
+
+  final bool canCreateSale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Column(
+        children: [
+          if (canCreateSale)
+            _QuickTile(
+              icon: Icons.point_of_sale,
+              accent: AppColors.primary,
+              title: 'New Sale',
+              subtitle: 'Start ringing up an order',
+              onTap: () {
+                HapticFeedback.selectionClick();
+                context.push(Routes.pos);
+              },
+            ),
+          _QuickTile(
+            icon: Icons.receipt_long,
+            accent: AppColors.secondary,
+            title: 'Sales History',
+            subtitle: 'Browse and search past sales',
+            onTap: () => context.go(Routes.sales),
+          ),
+          _QuickTile(
+            icon: Icons.print,
+            accent: AppColors.success,
+            title: 'Printer Setup',
+            subtitle: 'Connect and test the receipt printer',
+            onTap: () => context.go(Routes.printer),
+          ),
+          _QuickTile(
+            icon: Icons.person,
+            accent: AppColors.warning,
+            title: 'My Profile',
+            subtitle: 'Account details and sign out',
+            onTap: () => context.go(Routes.profile),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickTile extends StatelessWidget {
+  const _QuickTile({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Container(
+                height: 44,
+                width: 44,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.lg,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.history,
+            size: 18,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'Recent sales',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.go(Routes.sales),
+            child: const Text('View all'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _RecentSaleTile extends StatelessWidget {
   const _RecentSaleTile({required this.sale});
 
@@ -255,6 +304,13 @@ class _RecentSaleTile extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
+        ),
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+          child: const Icon(
+            Icons.receipt_long_outlined,
+            color: AppColors.primary,
+          ),
         ),
         title: Text(
           sale.referenceNo,
@@ -328,8 +384,8 @@ class _NoRecentSales extends StatelessWidget {
   }
 }
 
-class _DashboardSkeleton extends StatelessWidget {
-  const _DashboardSkeleton();
+class _RecentSkeleton extends StatelessWidget {
+  const _RecentSkeleton();
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +393,7 @@ class _DashboardSkeleton extends StatelessWidget {
 
     Widget block(double height) => Container(
       height: height,
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
         color: base,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -344,34 +401,16 @@ class _DashboardSkeleton extends StatelessWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: block(104)),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: block(104)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(child: block(104)),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(child: block(104)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          block(120),
-        ],
+        children: [block(64), block(64), block(64)],
       ),
     );
   }
 }
 
-class _DashboardError extends StatelessWidget {
-  const _DashboardError({required this.error, required this.onRetry});
+class _RecentError extends StatelessWidget {
+  const _RecentError({required this.error, required this.onRetry});
 
   final Object error;
   final VoidCallback onRetry;
@@ -384,13 +423,12 @@ class _DashboardError extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.cloud_off, size: 48, color: theme.colorScheme.error),
-          const SizedBox(height: AppSpacing.md),
+          Icon(Icons.cloud_off, size: 40, color: theme.colorScheme.error),
+          const SizedBox(height: AppSpacing.sm),
           Text(
-            'Could not load your dashboard',
-            style: theme.textTheme.titleMedium?.copyWith(
+            'Could not load recent sales',
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -402,7 +440,7 @@ class _DashboardError extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           FilledButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh),

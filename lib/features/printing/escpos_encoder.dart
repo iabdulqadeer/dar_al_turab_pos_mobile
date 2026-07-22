@@ -66,13 +66,48 @@ class EscPosEncoder {
   /// [copies] prints the same receipt more than once. The API returns a
   /// single copy, whereas the web app printed Customer + Company copies, so
   /// the number of physical copies is a client decision.
+  /// Lays a line out inside a fixed [contentWidth] field and shifts it right by
+  /// [leftMargin], so the whole receipt prints as one centred block rather than
+  /// hugging the paper's left edge.
+  ///
+  /// Alignment is baked into leading spaces (never trailing) and the caller
+  /// emits every line left-aligned — this keeps the margin uniform across left,
+  /// centre and right lines, which per-line `ESC a` centring cannot do when the
+  /// paper is wider than the content. The preview renders with this same
+  /// function, so what is shown is what prints.
+  static String layoutLine(
+    String text,
+    ReceiptAlign align,
+    int contentWidth,
+    int leftMargin,
+  ) {
+    final margin = ' ' * (leftMargin < 0 ? 0 : leftMargin);
+    final slack = contentWidth - text.length;
+    if (slack <= 0) return '$margin$text';
+
+    return switch (align) {
+      ReceiptAlign.left => '$margin$text',
+      ReceiptAlign.center => '$margin${' ' * (slack ~/ 2)}$text',
+      ReceiptAlign.right => '$margin${' ' * slack}$text',
+    };
+  }
+
+  /// Encodes [lines] into a printable byte stream.
+  ///
+  /// [copies] prints the same receipt more than once. When [contentWidth] > 0,
+  /// each line is laid out via [layoutLine] and emitted left-aligned so the
+  /// receipt sits as a centred block with [leftMargin] on the left; when it is
+  /// 0, the server's per-line alignment is used verbatim.
   Uint8List encode(
     List<ReceiptLine> lines, {
     int copies = 1,
     int trailingFeed = 4,
+    int contentWidth = 0,
+    int leftMargin = 0,
   }) {
     assert(copies >= 1, 'copies must be at least 1');
 
+    final centred = contentWidth > 0;
     final bytes = <int>[];
 
     for (var copy = 0; copy < copies; copy++) {
@@ -87,9 +122,16 @@ class EscPosEncoder {
       var currentSize = ReceiptSize.normal;
 
       for (final line in lines) {
-        if (line.align != currentAlign) {
-          bytes.addAll(EscPos.align(line.align));
-          currentAlign = line.align;
+        // In centred mode every line is left-aligned and the alignment is
+        // pre-baked into the text; otherwise honour the line's own alignment.
+        final emitAlign = centred ? ReceiptAlign.left : line.align;
+        final text = centred
+            ? layoutLine(line.text, line.align, contentWidth, leftMargin)
+            : line.text;
+
+        if (emitAlign != currentAlign) {
+          bytes.addAll(EscPos.align(emitAlign));
+          currentAlign = emitAlign;
         }
         if (line.bold != currentBold) {
           bytes.addAll(EscPos.bold(line.bold));
@@ -101,7 +143,7 @@ class EscPosEncoder {
         }
 
         bytes
-          ..addAll(_encodeText(line.text))
+          ..addAll(_encodeText(text))
           ..addAll(EscPos.lineFeed);
       }
 
