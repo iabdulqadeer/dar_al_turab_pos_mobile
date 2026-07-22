@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/providers/auth_providers.dart';
+import 'features/branding/providers/branding_providers.dart';
 import 'features/printing/providers/printer_providers.dart';
 
 void main() {
@@ -43,6 +45,15 @@ class _DarAlTurabPosAppState extends ConsumerState<DarAlTurabPosApp>
 
   @override
   Widget build(BuildContext context) {
+    // Branding needs a token, so refresh it once the session is live. Listening
+    // here (rather than inside the auth controller) keeps auth and branding
+    // from importing each other.
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (next is AuthSignedIn && previous is! AuthSignedIn) {
+        ref.read(brandingProvider.notifier).refresh();
+      }
+    });
+
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(

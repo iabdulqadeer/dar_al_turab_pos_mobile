@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../branding/presentation/brand_logo.dart';
 
 /// Shown while the stored token is restored and revalidated against
 /// `/auth/me`. The router keeps us here until auth state resolves.
@@ -35,19 +36,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Image.asset(
-              onDark
-                  ? 'assets/brand/logo_mono_light.png'
-                  : 'assets/brand/logo.png',
-              width: 200,
-              // The launcher already showed the mark; if the asset is missing
-              // the app should still boot rather than throw on a grey screen.
-              errorBuilder: (_, _, _) => const Icon(
-                Icons.storefront_outlined,
-                size: 56,
-                color: AppColors.primary,
-              ),
-            ),
+            BrandLogo(width: 200, onDark: onDark),
             const SizedBox(height: AppSpacing.xl),
             const SizedBox(
               height: 24,

@@ -22,9 +22,15 @@ class AppShell extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
     final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
 
-    // Only the Dashboard (0) and Sales (1) tabs offer "New sale"; the Printer
-    // and Profile tabs are not places a sale would be started from.
-    final showNewSale = canCreateSale && navigationShell.currentIndex <= 1;
+    // "New sale" belongs on the Dashboard and the Sales list only — not on the
+    // Printer/Profile tabs, and not on screens pushed inside those branches
+    // (a sale's detail page already has its own Settle action, and two FABs
+    // would collide). Matching the exact branch root keeps it to the two
+    // list-level screens.
+    final location = GoRouterState.of(context).matchedLocation;
+    final atTabRoot =
+        location == Routes.dashboard || location == Routes.sales;
+    final showNewSale = canCreateSale && atTabRoot;
 
     return Scaffold(
       body: navigationShell,

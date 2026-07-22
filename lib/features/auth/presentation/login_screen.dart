@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../branding/presentation/brand_logo.dart';
 import '../providers/auth_providers.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -261,25 +262,7 @@ class _Brand extends StatelessWidget {
 
     return Column(
       children: [
-        Image.asset(
-          onDark
-              ? 'assets/brand/logo_mono_light.png'
-              : 'assets/brand/logo.png',
-          width: 190,
-          errorBuilder: (_, _, _) => Container(
-            height: 72,
-            width: 72,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-            ),
-            child: const Icon(
-              Icons.storefront_outlined,
-              color: Colors.white,
-              size: 36,
-            ),
-          ),
-        ),
+        BrandLogo(width: 190, onDark: onDark),
         const SizedBox(height: AppSpacing.md),
         Text(
           'Sign in to continue',

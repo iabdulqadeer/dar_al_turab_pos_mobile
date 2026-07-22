@@ -6,6 +6,8 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/auth_user.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../branding/presentation/brand_logo.dart';
+import '../../branding/providers/branding_providers.dart';
 import '../../printing/providers/printer_providers.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -77,6 +79,10 @@ class ProfileScreen extends ConsumerWidget {
 
             _SectionLabel('Access'),
             _PermissionsCard(user: user),
+            const SizedBox(height: AppSpacing.lg),
+
+            _SectionLabel('Company'),
+            const _CompanyCard(),
             const SizedBox(height: AppSpacing.lg),
 
             OutlinedButton.icon(
@@ -201,12 +207,17 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow({
     required this.icon,
     required this.value,
+    this.label,
     this.fallback,
     this.isWarning = false,
   });
 
   final IconData icon;
   final String? value;
+
+  /// Optional caption above the value, for rows whose meaning is not obvious
+  /// from the icon alone (Company, TRN, Address …).
+  final String? label;
   final String? fallback;
   final bool isWarning;
 
@@ -228,12 +239,22 @@ class _InfoRow extends StatelessWidget {
           Icon(icon, size: 16, color: color),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: isWarning ? AppColors.error : null,
-                fontWeight: isWarning ? FontWeight.w600 : null,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (label != null)
+                  Text(
+                    label!,
+                    style: theme.textTheme.labelSmall?.copyWith(color: color),
+                  ),
+                Text(
+                  text,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: isWarning ? AppColors.error : null,
+                    fontWeight: isWarning ? FontWeight.w600 : null,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -244,6 +265,78 @@ class _InfoRow extends StatelessWidget {
 
 /// Shows what this user is actually allowed to do. Useful in the field: when
 /// a button is missing, this explains why without a call to the office.
+/// Company branding, live from the web admin (`/v1/settings/general`) and
+/// cached on the device. Changing it on the website changes it here — no app
+/// release needed. Shows nothing until branding has been fetched at least once.
+class _CompanyCard extends ConsumerWidget {
+  const _CompanyCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final brand = ref.watch(brandingProvider);
+
+    if (brand == null) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(AppSpacing.md),
+          child: _InfoRow(
+            icon: Icons.info_outline,
+            label: 'Company details',
+            value: 'Not loaded yet',
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: BrandLogo(
+                width: 160,
+                onDark: Theme.of(context).brightness == Brightness.dark,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _InfoRow(
+              icon: Icons.business_outlined,
+              label: 'Company',
+              value: brand.displayName,
+            ),
+            if (brand.vatRegistrationNumber != null)
+              _InfoRow(
+                icon: Icons.receipt_long_outlined,
+                label: 'TRN',
+                value: brand.vatRegistrationNumber!,
+              ),
+            if (brand.address != null)
+              _InfoRow(
+                icon: Icons.location_on_outlined,
+                label: 'Address',
+                value: brand.address!,
+              ),
+            if (brand.phone != null)
+              _InfoRow(
+                icon: Icons.phone_outlined,
+                label: 'Phone',
+                value: brand.phone!,
+              ),
+            if (brand.developedBy != null)
+              _InfoRow(
+                icon: Icons.code_outlined,
+                label: 'Developed by',
+                value: brand.developedBy!,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PermissionsCard extends StatelessWidget {
   const _PermissionsCard({required this.user});
 
