@@ -36,11 +36,16 @@ class _DarAlTurabPosAppState extends ConsumerState<DarAlTurabPosApp>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
     // The Bluetooth link drops when the app is backgrounded/closed or the phone
     // sleeps. Silently re-establish it on resume so the printer is ready.
-    if (state == AppLifecycleState.resumed) {
-      ref.read(printerControllerProvider.notifier).autoReconnect();
-    }
+    ref.read(printerControllerProvider.notifier).autoReconnect();
+
+    // Pick up branding changed in the web admin without needing a restart.
+    // Best-effort: refresh() swallows failures and keeps the cached copy, and
+    // is harmless when signed out (the request just 401s).
+    ref.read(brandingProvider.notifier).refresh();
   }
 
   @override
