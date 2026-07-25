@@ -310,6 +310,10 @@ class _ProductResults extends ConsumerWidget {
       ),
       data: (products) {
         if (products.isEmpty) {
+          // Before the cashier has typed, guide them; only call it "not found"
+          // once a search has actually returned nothing.
+          final searching =
+              ref.watch(productSearchQueryProvider).trim().isNotEmpty;
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -317,14 +321,27 @@ class _ProductResults extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.inventory_2_outlined,
+                    searching
+                        ? Icons.search_off_outlined
+                        : Icons.storefront_outlined,
                     size: 48,
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(
-                    'No products found',
+                    searching ? 'No products found' : 'Start a sale',
                     style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    searching
+                        ? 'Try a different name, code or barcode.'
+                        : 'Search a product by name, code or barcode '
+                              'to add it to the sale.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),

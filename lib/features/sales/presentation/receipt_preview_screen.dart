@@ -147,6 +147,10 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
     final saved = ref.watch(printerControllerProvider).saved;
 
     return Scaffold(
+      // A slightly deeper "desk" behind the white paper sheets so they read as
+      // sheets in both light and dark mode. The paper itself stays white
+      // (a receipt is white paper); this only themes the surround.
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       appBar: AppBar(title: const Text('Print preview')),
       body: _buildBody(saved),
       bottomNavigationBar: _document == null

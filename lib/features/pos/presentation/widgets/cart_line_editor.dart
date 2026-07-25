@@ -295,7 +295,9 @@ class _NumberField extends StatelessWidget {
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
       ],
-      decoration: InputDecoration(isDense: true, hintText: hint),
+      // No isDense: these weight/price fields are the cashier's main tap
+      // targets, so they keep the theme's full ~52px height for glove use.
+      decoration: InputDecoration(hintText: hint),
       onChanged: (text) => onChanged(double.tryParse(text) ?? 0),
     );
   }

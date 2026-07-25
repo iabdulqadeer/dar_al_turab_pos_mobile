@@ -323,8 +323,15 @@ class _RecentSaleTile extends StatelessWidget {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.xs,
         ),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+        // Same 44x44 rounded-square as the quick-menu tiles, so the leading
+        // icon column lines up between the two sections.
+        leading: Container(
+          height: 44,
+          width: 44,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
           child: const Icon(
             Icons.receipt_long_outlined,
             color: AppColors.primary,

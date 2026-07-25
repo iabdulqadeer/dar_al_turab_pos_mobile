@@ -382,7 +382,7 @@ class _DetailBody extends StatelessWidget {
               if (sale.totals.shippingCost > 0)
                 _TotalRow('Shipping', sale.totals.shippingCost),
               const Divider(height: AppSpacing.lg),
-              _TotalRow('Grand Total', sale.totals.grandTotal, emphasis: true),
+              _TotalRow('Grand Total', sale.totals.grandTotal, strong: true),
               _TotalRow('Paid', sale.totals.paidAmount),
               if (sale.totals.returnAdjustment > 0)
                 _TotalRow('Return Adjustment', sale.totals.returnAdjustment),
@@ -625,11 +625,14 @@ class _ItemRow extends StatelessWidget {
               Expanded(
                 child: Text(
                   item.displayName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
+              const SizedBox(width: AppSpacing.sm),
               Text(
                 Format.amount(item.total),
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -705,37 +708,41 @@ class _TotalRow extends StatelessWidget {
     this.label,
     this.value, {
     this.emphasis = false,
+    this.strong = false,
     this.color,
   });
 
   final String label;
   final double value;
+
+  /// Bold secondary line (e.g. Due).
   final bool emphasis;
+
+  /// The headline figure (Grand Total): largest, in the brand colour so it is
+  /// the first thing read.
+  final bool strong;
   final Color? color;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = emphasis
+    final style = strong
+        ? theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)
+        : emphasis
         ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800)
         : theme.textTheme.bodyMedium;
 
+    // Grand Total pops in the brand colour unless the caller forces a colour.
+    final valueColor = color ?? (strong ? theme.colorScheme.primary : null);
+    final labelColor = color ??
+        (strong || emphasis ? null : theme.colorScheme.onSurfaceVariant);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: EdgeInsets.symmetric(vertical: strong ? AppSpacing.xs : 3),
       child: Row(
         children: [
-          Expanded(
-            child: Text(
-              label,
-              style: style?.copyWith(
-                color: color ?? (emphasis ? null : theme.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ),
-          Text(
-            Format.amount(value),
-            style: style?.copyWith(color: color),
-          ),
+          Expanded(child: Text(label, style: style?.copyWith(color: labelColor))),
+          Text(Format.amount(value), style: style?.copyWith(color: valueColor)),
         ],
       ),
     );

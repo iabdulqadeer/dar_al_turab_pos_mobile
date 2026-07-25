@@ -80,28 +80,25 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
           ),
           const AppOverflowMenu(),
         ],
+        // Only the search stays pinned; the summary moved into the scrolling
+        // list so it gives its vertical space back as you scroll results.
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(112),
-          child: Column(
-            children: [
-              _SearchField(
-                controller: _searchController,
-                onSubmitted: (value) =>
-                    ref.read(saleFiltersProvider.notifier).setSearch(value),
-              ),
-              _SummaryBar(state: state, filters: filters),
-            ],
+          preferredSize: const Size.fromHeight(60),
+          child: _SearchField(
+            controller: _searchController,
+            onSubmitted: (value) =>
+                ref.read(saleFiltersProvider.notifier).setSearch(value),
           ),
         ),
       ),
       body: RefreshIndicator(
         onRefresh: () => ref.read(salesListProvider.notifier).refresh(),
-        child: _buildBody(state),
+        child: _buildBody(state, filters),
       ),
     );
   }
 
-  Widget _buildBody(SalesListState state) {
+  Widget _buildBody(SalesListState state, SaleFilters filters) {
     if (state.isLoading && state.items.isEmpty) {
       return const _LoadingList();
     }
@@ -117,21 +114,32 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
       return const _EmptyView();
     }
 
+    // Index 0 is the summary header (scrolls away with the list); the rest are
+    // sale cards, then an optional load-more spinner.
+    const headerCount = 1;
+
     return ListView.separated(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+      itemCount:
+          headerCount + state.items.length + (state.isLoadingMore ? 1 : 0),
+      separatorBuilder: (_, index) =>
+          SizedBox(height: index == 0 ? AppSpacing.md : AppSpacing.sm),
       itemBuilder: (context, index) {
-        if (index >= state.items.length) {
+        if (index == 0) {
+          return _SummaryBar(state: state, filters: filters);
+        }
+
+        final itemIndex = index - headerCount;
+        if (itemIndex >= state.items.length) {
           return const Padding(
             padding: EdgeInsets.all(AppSpacing.md),
             child: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final sale = state.items[index];
+        final sale = state.items[itemIndex];
         return _SaleCard(
           sale: sale,
           onTap: () => context.push('${Routes.sales}/${sale.id}'),
