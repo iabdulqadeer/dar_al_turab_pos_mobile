@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/models/receipt.dart';
 import '../escpos_encoder.dart';
 import '../printer_transport.dart';
@@ -37,7 +38,10 @@ class _PrinterSettingsScreenState
     final unsupportedReason = ref.watch(printingUnsupportedReasonProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Printer')),
+      appBar: AppBar(
+        title: const Text('Printer'),
+        actions: const [AppOverflowMenu()],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [

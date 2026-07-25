@@ -1,46 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-import '../../data/models/auth_user.dart';
-import '../../features/auth/providers/auth_providers.dart';
-import '../router/app_router.dart';
 
 /// Bottom-navigation shell wrapping the primary destinations.
 ///
 /// Uses go_router's [StatefulNavigationShell] so each tab keeps its own
 /// navigation stack and scroll position — switching away from a filtered sales
 /// list and back should not reset it.
-class AppShell extends ConsumerWidget {
+///
+/// Deliberately owns no floating action button. A FAB here is visible on every
+/// screen inside every branch, including pushed ones like a sale's detail page,
+/// and the shell cannot tell them apart: `GoRouterState.of(context)` resolves
+/// against the shell's own route match (`/sales`), not the route pushed inside
+/// the branch navigator (`/sales/123`). The screens that want a FAB declare it
+/// on their own Scaffold instead.
+class AppShell extends StatelessWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
-
-    // "New sale" belongs on the Dashboard and the Sales list only — not on the
-    // Printer/Profile tabs, and not on screens pushed inside those branches
-    // (a sale's detail page already has its own Settle action, and two FABs
-    // would collide). Matching the exact branch root keeps it to the two
-    // list-level screens.
-    final location = GoRouterState.of(context).matchedLocation;
-    final atTabRoot =
-        location == Routes.dashboard || location == Routes.sales;
-    final showNewSale = canCreateSale && atTabRoot;
-
+  Widget build(BuildContext context) {
     return Scaffold(
       body: navigationShell,
-      floatingActionButton: showNewSale
-          ? FloatingActionButton.extended(
-              onPressed: () => context.push(Routes.pos),
-              icon: const Icon(Icons.add_shopping_cart),
-              label: const Text('New sale'),
-            )
-          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _onDestinationSelected,
@@ -80,5 +62,4 @@ class AppShell extends ConsumerWidget {
       initialLocation: index == navigationShell.currentIndex,
     );
   }
-
 }

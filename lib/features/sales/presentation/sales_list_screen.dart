@@ -6,9 +6,12 @@ import '../../../core/extensions/formatting.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/datasources/remote/sales_api.dart';
+import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../../data/models/sale_status.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../providers/sales_providers.dart';
 import 'widgets/status_chip.dart';
 
@@ -50,8 +53,19 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(salesListProvider);
     final filters = ref.watch(saleFiltersProvider);
+    final canCreateSale =
+        ref.watch(currentUserProvider)?.can(Permissions.salesAdd) ?? false;
 
     return Scaffold(
+      // FAB declared here (not on the shell) so it shows on the Sales list only,
+      // never on a sale's detail page pushed over it.
+      floatingActionButton: canCreateSale
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push(Routes.pos),
+              icon: const Icon(Icons.add_shopping_cart),
+              label: const Text('New sale'),
+            )
+          : null,
       appBar: AppBar(
         title: const Text('Sales'),
         actions: [
@@ -64,6 +78,7 @@ class _SalesListScreenState extends ConsumerState<SalesListScreen> {
             tooltip: 'Filters',
             onPressed: _openFilters,
           ),
+          const AppOverflowMenu(),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(112),

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/models/auth_user.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../branding/presentation/brand_logo.dart';
@@ -24,7 +25,10 @@ class ProfileScreen extends ConsumerWidget {
     final printer = ref.watch(printerControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: const [AppOverflowMenu()],
+      ),
       body: RefreshIndicator(
         onRefresh: () =>
             ref.read(authControllerProvider.notifier).refreshUser(),

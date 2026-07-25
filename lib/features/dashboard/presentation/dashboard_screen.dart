@@ -7,10 +7,12 @@ import '../../../core/extensions/formatting.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/datasources/remote/sales_api.dart';
 import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../branding/providers/branding_providers.dart';
 import '../providers/dashboard_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -20,9 +22,25 @@ class DashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final recent = ref.watch(dashboardRecentProvider);
+    final brand = ref.watch(brandingProvider);
     final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
 
     return Scaffold(
+      // Sticky top bar: the brand name and the shared overflow menu, matching
+      // the other tabs so every screen has a fixed header.
+      appBar: AppBar(
+        title: Text(brand?.systemTitle ?? 'Dar Al Turab'),
+        actions: const [AppOverflowMenu()],
+      ),
+      // The FAB lives here rather than on the shell so it appears on this
+      // screen only, never on pages pushed over it.
+      floatingActionButton: canCreateSale
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push(Routes.pos),
+              icon: const Icon(Icons.add_shopping_cart),
+              label: const Text('New sale'),
+            )
+          : null,
       body: SafeArea(
         bottom: false,
         child: RefreshIndicator(
