@@ -20,7 +20,8 @@ class StatusChip extends StatelessWidget {
         PaymentStatus.paid => AppColors.success,
         PaymentStatus.partial => AppColors.warning,
         PaymentStatus.due || PaymentStatus.pending => AppColors.error,
-        null => AppColors.lightTextSecondary,
+        // Neutral: resolved from the theme in build() so it adapts to dark mode.
+        null => null,
       },
       // Icon + colour + label so payment state reads without relying on colour
       // alone (colour-blind accessibility).
@@ -39,8 +40,9 @@ class StatusChip extends StatelessWidget {
       color: switch (status) {
         SaleStatus.completed => AppColors.success,
         SaleStatus.pending => AppColors.warning,
-        SaleStatus.draft => AppColors.lightTextSecondary,
-        null => AppColors.lightTextSecondary,
+        // Neutral: resolved from the theme in build() so it adapts to dark mode.
+        SaleStatus.draft => null,
+        null => null,
       },
       icon: switch (status) {
         SaleStatus.completed => Icons.check_circle_outline,
@@ -52,11 +54,17 @@ class StatusChip extends StatelessWidget {
   }
 
   final String label;
-  final Color color;
+
+  /// Semantic colour, or null for a neutral state that follows the theme.
+  final Color? color;
   final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
+    // Neutral states (draft, unknown) take the theme's muted colour so they
+    // stay legible in both light and dark mode.
+    final color = this.color ?? Theme.of(context).colorScheme.onSurfaceVariant;
+
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,

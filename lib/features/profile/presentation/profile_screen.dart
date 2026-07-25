@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/models/auth_user.dart';
 import '../../auth/providers/auth_providers.dart';
@@ -37,6 +38,10 @@ class ProfileScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           children: [
             _IdentityCard(user: user),
+            const SizedBox(height: AppSpacing.lg),
+
+            _SectionLabel('Appearance'),
+            const _AppearanceCard(),
             const SizedBox(height: AppSpacing.lg),
 
             _SectionLabel('Account'),
@@ -324,6 +329,45 @@ class _CompanyCard extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Light / dark / system picker. Reads and writes the persisted
+/// [themeModeProvider]; the active mode gets a trailing check. Uses the same
+/// _MenuCard / _MenuTile styling as the other Profile sections.
+class _AppearanceCard extends ConsumerWidget {
+  const _AppearanceCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    final controller = ref.read(themeModeProvider.notifier);
+    final active = Theme.of(context).colorScheme.primary;
+
+    Widget tile(ThemeMode value, IconData icon, String title, String subtitle) {
+      return _MenuTile(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
+        trailing: mode == value
+            ? Icon(Icons.check_circle, size: 18, color: active)
+            : null,
+        onTap: () => controller.setMode(value),
+      );
+    }
+
+    return _MenuCard(
+      children: [
+        tile(
+          ThemeMode.system,
+          Icons.brightness_auto,
+          'System',
+          'Match the phone\'s theme',
+        ),
+        tile(ThemeMode.light, Icons.light_mode, 'Light', 'Always light'),
+        tile(ThemeMode.dark, Icons.dark_mode, 'Dark', 'Always dark'),
+      ],
     );
   }
 }

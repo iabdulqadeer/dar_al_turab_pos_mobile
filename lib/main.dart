@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'features/auth/providers/auth_providers.dart';
 import 'features/branding/providers/branding_providers.dart';
 import 'features/printing/providers/printer_providers.dart';
@@ -66,7 +67,7 @@ class _DarAlTurabPosAppState extends ConsumerState<DarAlTurabPosApp>
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
     );
   }
