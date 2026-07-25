@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/providers/auth_providers.dart';
+import '../../features/branding/presentation/about_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/pos/presentation/edit_sale_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
@@ -19,6 +20,9 @@ import '../widgets/app_shell.dart';
 abstract final class Routes {
   static const splash = '/';
   static const login = '/login';
+
+  /// Company / About page. Reachable signed out (from the login footer).
+  static const about = '/about';
 
   // Bottom-navigation branches. Each is the root of its own stack.
   static const dashboard = '/dashboard';
@@ -55,6 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.login,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: Routes.about,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AboutScreen(),
       ),
       GoRoute(
         path: Routes.pos,
@@ -163,7 +172,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       final signedIn = auth is AuthSignedIn;
 
       if (!signedIn) {
-        return location == Routes.login ? null : Routes.login;
+        // About is public so it can be opened from the login footer.
+        return (location == Routes.login || location == Routes.about)
+            ? null
+            : Routes.login;
       }
 
       if (location == Routes.login || location == Routes.splash) {

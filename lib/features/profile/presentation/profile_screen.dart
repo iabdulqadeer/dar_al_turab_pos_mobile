@@ -7,7 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/models/auth_user.dart';
 import '../../auth/providers/auth_providers.dart';
-import '../../branding/presentation/brand_logo.dart';
+import '../../branding/presentation/company_details.dart';
 import '../../branding/providers/branding_providers.dart';
 import '../../printing/providers/printer_providers.dart';
 
@@ -293,48 +293,35 @@ class _CompanyCard extends ConsumerWidget {
     }
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: BrandLogo(
-                width: 160,
-                onDark: Theme.of(context).brightness == Brightness.dark,
+      child: InkWell(
+        onTap: () => context.push(Routes.about),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CompanyDetails(brand: brand),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    'About',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _InfoRow(
-              icon: Icons.business_outlined,
-              label: 'Company',
-              value: brand.displayName,
-            ),
-            if (brand.vatRegistrationNumber != null)
-              _InfoRow(
-                icon: Icons.receipt_long_outlined,
-                label: 'TRN',
-                value: brand.vatRegistrationNumber!,
-              ),
-            if (brand.address != null)
-              _InfoRow(
-                icon: Icons.location_on_outlined,
-                label: 'Address',
-                value: brand.address!,
-              ),
-            if (brand.phone != null)
-              _InfoRow(
-                icon: Icons.phone_outlined,
-                label: 'Phone',
-                value: brand.phone!,
-              ),
-            if (brand.developedBy != null)
-              _InfoRow(
-                icon: Icons.code_outlined,
-                label: 'Developed by',
-                value: brand.developedBy!,
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
