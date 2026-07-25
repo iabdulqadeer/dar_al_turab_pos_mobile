@@ -6,15 +6,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Mirrors the printer/branding provider pattern: the saved value is restored
 /// asynchronously via `Future.microtask(_restore)` so it never blocks first
-/// paint. Until the restore completes the app shows [ThemeMode.system], which is
+/// paint. Until the restore completes the app shows [ThemeMode.light], which is
 /// also the default when nothing has been saved.
 class ThemeModeController extends Notifier<ThemeMode> {
   static const _prefsKey = 'theme_mode';
 
+  /// Shown on first launch and used as the fallback for an unreadable value.
+  static const _default = ThemeMode.light;
+
   @override
   ThemeMode build() {
     Future.microtask(_restore);
-    return ThemeMode.system;
+    return _default;
   }
 
   Future<void> _restore() async {
@@ -37,7 +40,8 @@ class ThemeModeController extends Notifier<ThemeMode> {
   static ThemeMode _fromName(String name) => switch (name) {
     'light' => ThemeMode.light,
     'dark' => ThemeMode.dark,
-    _ => ThemeMode.system,
+    'system' => ThemeMode.system,
+    _ => _default,
   };
 }
 

@@ -7,12 +7,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('defaults to system when nothing is saved', () async {
+  test('defaults to light when nothing is saved', () async {
     SharedPreferences.setMockInitialValues({});
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
-    expect(container.read(themeModeProvider), ThemeMode.system);
+    expect(container.read(themeModeProvider), ThemeMode.light);
+  });
+
+  test('restores an explicitly saved system mode', () async {
+    SharedPreferences.setMockInitialValues({'theme_mode': 'system'});
+    final container = ProviderContainer();
+    container.listen(themeModeProvider, (_, _) {});
+    addTearDown(container.dispose);
+
+    final mode = await _settled(container, until: ThemeMode.system);
+
+    expect(mode, ThemeMode.system);
   });
 
   test('setMode updates state and persists the choice', () async {
@@ -27,19 +38,20 @@ void main() {
     expect(prefs.getString('theme_mode'), 'dark');
   });
 
-  test('restores a saved mode on build', () async {
-    SharedPreferences.setMockInitialValues({'theme_mode': 'light'});
+  test('restores a saved non-default mode on build', () async {
+    // Saved value differs from the light default, so this proves restoration.
+    SharedPreferences.setMockInitialValues({'theme_mode': 'dark'});
     final container = ProviderContainer();
     // Keep it alive and let the async restore settle before asserting.
     container.listen(themeModeProvider, (_, _) {});
     addTearDown(container.dispose);
 
-    final mode = await _settled(container, until: ThemeMode.light);
+    final mode = await _settled(container, until: ThemeMode.dark);
 
-    expect(mode, ThemeMode.light);
+    expect(mode, ThemeMode.dark);
   });
 
-  test('a corrupt/unknown saved value falls back to system', () async {
+  test('a corrupt/unknown saved value falls back to the light default', () async {
     SharedPreferences.setMockInitialValues({'theme_mode': 'garbage'});
     final container = ProviderContainer();
     container.listen(themeModeProvider, (_, _) {});
@@ -48,7 +60,7 @@ void main() {
     // Let any pending restore run, then confirm it stayed on the fallback.
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
-    expect(container.read(themeModeProvider), ThemeMode.system);
+    expect(container.read(themeModeProvider), ThemeMode.light);
   });
 }
 
