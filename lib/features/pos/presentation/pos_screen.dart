@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/extensions/formatting.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/catalogue.dart';
+import '../../branding/providers/branding_providers.dart';
 import '../domain/cart.dart';
 import '../providers/pos_providers.dart';
 import 'widgets/barcode_scanner_sheet.dart';
@@ -20,6 +21,19 @@ class PosScreen extends ConsumerStatefulWidget {
 
 class _PosScreenState extends ConsumerState<PosScreen> {
   final _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Pull the global tax rate fresh from /settings/general at the start of
+    // every sale, so it is current (not a stale cache) and clearly
+    // endpoint-sourced. Best-effort: refresh() swallows failures and keeps the
+    // cached value; the cart's saleTaxRateProvider listener applies the rate to
+    // lines when it arrives.
+    Future.microtask(
+      () => ref.read(brandingProvider.notifier).refresh(),
+    );
+  }
 
   @override
   void dispose() {

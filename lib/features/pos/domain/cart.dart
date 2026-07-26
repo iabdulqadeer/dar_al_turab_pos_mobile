@@ -297,9 +297,8 @@ class Cart {
           'paid_by_id': paymentMethodId,
           'paid_amount': paidAmount,
           // Cheque (id 4) carries its number/date; Deposit (id 6) a bank_id.
-          // NOTE: the server currently strips payment.bank_id on create
-          // (CreateSaleRequest), so the deposit bank won't persist until the
-          // backend adds that validation rule. Cheque fields persist today.
+          // Both persist on create: the backend validates payment.cheque_no/
+          // cheque_date and (since 2026-07-26) payment.bank_id.
           if (chequeNo != null && chequeNo.isNotEmpty) 'cheque_no': chequeNo,
           if (chequeDate != null)
             'cheque_date': chequeDate.toIso8601String().split('T').first,
