@@ -30,7 +30,6 @@ class _CartLineEditorState extends State<CartLineEditor> {
   late final TextEditingController _pcs;
   late final TextEditingController _gross;
   late final TextEditingController _waste;
-  late final TextEditingController _discount;
 
   @override
   void initState() {
@@ -40,12 +39,11 @@ class _CartLineEditorState extends State<CartLineEditor> {
     _pcs = TextEditingController(text: _fmt(_line.noOfPcs));
     _gross = TextEditingController(text: _fmt(_line.grossWeight));
     _waste = TextEditingController(text: _fmt(_line.wasteQty));
-    _discount = TextEditingController(text: _fmt(_line.discount));
   }
 
   @override
   void dispose() {
-    for (final c in [_price, _qty, _pcs, _gross, _waste, _discount]) {
+    for (final c in [_price, _qty, _pcs, _gross, _waste]) {
       c.dispose();
     }
     super.dispose();
@@ -91,16 +89,6 @@ class _CartLineEditorState extends State<CartLineEditor> {
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              Text(
-                'In stock: ${Format.quantity(_line.product.stock)}'
-                '${_line.unit == null ? '' : ' ${_line.unit!.name}'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: _line.exceedsStock
-                      ? AppColors.error
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: _line.exceedsStock ? FontWeight.w700 : null,
-                ),
-              ),
               const SizedBox(height: AppSpacing.lg),
 
               if (_isWeightBased) ...[
@@ -138,12 +126,13 @@ class _CartLineEditorState extends State<CartLineEditor> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _Label('Gross weight'),
+                          // Cashier enters Gross and Waste; Net is derived.
                           _NumberField(
                             controller: _gross,
                             onChanged: (v) => setState(() {
                               _line.grossWeight = v;
-                              _line.syncWasteFromWeights();
-                              _waste.text = _fmt(_line.wasteQty);
+                              _line.syncNetFromWeights();
+                              _qty.text = _fmt(_line.qty);
                             }),
                           ),
                         ],
@@ -157,7 +146,11 @@ class _CartLineEditorState extends State<CartLineEditor> {
                           _Label('Waste'),
                           _NumberField(
                             controller: _waste,
-                            onChanged: (v) => setState(() => _line.wasteQty = v),
+                            onChanged: (v) => setState(() {
+                              _line.wasteQty = v;
+                              _line.syncNetFromWeights();
+                              _qty.text = _fmt(_line.qty);
+                            }),
                           ),
                         ],
                       ),
@@ -176,13 +169,10 @@ class _CartLineEditorState extends State<CartLineEditor> {
                         _Label(_isWeightBased ? 'Net weight' : 'Quantity'),
                         _NumberField(
                           controller: _qty,
-                          onChanged: (v) => setState(() {
-                            _line.qty = v;
-                            if (_isWeightBased) {
-                              _line.syncWasteFromWeights();
-                              _waste.text = _fmt(_line.wasteQty);
-                            }
-                          }),
+                          // Weight-based: Net is computed from Gross − Waste and
+                          // is read-only; otherwise it's the editable quantity.
+                          enabled: !_isWeightBased,
+                          onChanged: (v) => setState(() => _line.qty = v),
                         ),
                       ],
                     ),
@@ -218,13 +208,6 @@ class _CartLineEditorState extends State<CartLineEditor> {
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
-
-              _Label('Line discount'),
-              _NumberField(
-                controller: _discount,
-                onChanged: (v) => setState(() => _line.discount = v),
-              ),
-              const SizedBox(height: AppSpacing.lg),
 
               _Totals(line: _line),
               const SizedBox(height: AppSpacing.lg),
@@ -281,23 +264,31 @@ class _NumberField extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     this.hint,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
   final ValueChanged<double> onChanged;
   final String? hint;
 
+  /// A disabled field is read-only — used for the computed Net weight.
+  final bool enabled;
+
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
+      enabled: enabled,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
       ],
       // No isDense: these weight/price fields are the cashier's main tap
       // targets, so they keep the theme's full ~52px height for glove use.
-      decoration: InputDecoration(hintText: hint),
+      decoration: InputDecoration(
+        hintText: hint,
+        helperText: enabled ? null : 'Gross − Waste',
+      ),
       onChanged: (text) => onChanged(double.tryParse(text) ?? 0),
     );
   }
@@ -345,9 +336,9 @@ class _Totals extends StatelessWidget {
       child: Column(
         children: [
           row(
-            'Tax'
-            '${line.taxRate > 0 ? ' (${Format.quantity(line.taxRate)}%'
-                  '${line.product.pricing.isTaxInclusive ? ', inclusive' : ''})' : ''}',
+            line.taxRate > 0
+                ? 'Tax (${Format.quantity(line.taxRate)})%'
+                : 'Tax',
             Format.amount(line.tax),
           ),
           const Divider(height: AppSpacing.md),

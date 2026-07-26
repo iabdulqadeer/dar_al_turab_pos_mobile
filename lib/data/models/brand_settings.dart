@@ -15,12 +15,20 @@ class BrandSettings {
     this.phone,
     this.developedBy,
     this.systemLogo,
+    this.tax,
   });
 
   factory BrandSettings.fromJson(Map<String, dynamic> json) {
     String? text(String key) {
       final value = json[key]?.toString().trim();
       return (value == null || value.isEmpty) ? null : value;
+    }
+
+    double? tax() {
+      final raw = json['tax'];
+      if (raw == null) return null;
+      if (raw is num) return raw.toDouble();
+      return double.tryParse(raw.toString());
     }
 
     return BrandSettings(
@@ -31,6 +39,7 @@ class BrandSettings {
       phone: text('phone'),
       developedBy: text('developed_by'),
       systemLogo: text('system_logo'),
+      tax: tax(),
     );
   }
 
@@ -50,6 +59,10 @@ class BrandSettings {
   /// provide a fallback.
   final String? systemLogo;
 
+  /// Global sale tax rate as a percent (e.g. 5 = 5%), or null when unset. The
+  /// POS applies this per line on the net total.
+  final double? tax;
+
   /// Best name to show where space allows.
   String get displayName => companyName ?? systemTitle;
 
@@ -63,5 +76,6 @@ class BrandSettings {
     'phone': phone,
     'developed_by': developedBy,
     'system_logo': systemLogo,
+    'tax': tax,
   };
 }

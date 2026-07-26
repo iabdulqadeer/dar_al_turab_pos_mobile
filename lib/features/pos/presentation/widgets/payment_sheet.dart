@@ -21,28 +21,41 @@ class PaymentSheet extends ConsumerStatefulWidget {
 
 class _PaymentSheetState extends ConsumerState<PaymentSheet> {
   final _tendered = TextEditingController();
+  final _discount = TextEditingController();
+  final _chequeNo = TextEditingController();
   PaymentMethodOption? _method;
+  int? _bankId;
+  DateTime? _chequeDate;
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    final total = ref.read(cartProvider).grandTotal;
-    _tendered.text = total.toStringAsFixed(2);
+    final cart = ref.read(cartProvider);
+    _tendered.text = cart.grandTotal.toStringAsFixed(2);
+    if (cart.orderDiscount > 0) {
+      _discount.text = cart.orderDiscount.toStringAsFixed(2);
+    }
   }
 
   @override
   void dispose() {
     _tendered.dispose();
+    _discount.dispose();
+    _chequeNo.dispose();
     super.dispose();
   }
 
   double get _paid => double.tryParse(_tendered.text) ?? 0;
 
+  bool get _isCheque => _method?.id == 4;
+  bool get _isDeposit => _method?.id == 6;
+
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     final meta = ref.watch(saleFormMetadataProvider).value;
+    final taxRate = ref.watch(saleTaxRateProvider);
     final theme = Theme.of(context);
 
     final methods = meta?.usablePaymentMethods ?? const <PaymentMethodOption>[];
@@ -80,6 +93,59 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: AppSpacing.sm),
+              // Tax breakdown, at the global rate from settings/general.
+              if (taxRate > 0)
+                _breakdownRow(
+                  theme,
+                  'Tax (${Format.quantity(taxRate)})%',
+                  Format.amount(cart.totalTax),
+                ),
+              const Divider(height: AppSpacing.xl),
+
+              // Invoice-level discount (flutter_app_issues #8): lowers the grand
+              // total live.
+              Text(
+                'Discount',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              TextField(
+                controller: _discount,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixIcon: Icon(Icons.discount_outlined, size: 20),
+                  hintText: '0.00',
+                ),
+                onChanged: (text) {
+                  ref
+                      .read(cartProvider.notifier)
+                      .setOrderDiscount(double.tryParse(text) ?? 0);
+                  _syncTendered();
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Remove-decimal toggle (flutter_app_issues #9): truncates the
+              // grand total to a whole number.
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: cart.removeDecimalAmount,
+                title: const Text('Remove decimal'),
+                subtitle: const Text('Drop the decimals from the grand total'),
+                onChanged: (value) {
+                  ref.read(cartProvider.notifier).setRemoveDecimalAmount(value);
+                  _syncTendered();
+                },
+              ),
               const Divider(height: AppSpacing.xl),
 
               Text(
@@ -103,6 +169,46 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
                     ),
                 ],
               ),
+
+              // Deposit (id 6) needs a bank; Cheque (id 4) a number + date.
+              if (_isDeposit) ...[
+                const SizedBox(height: AppSpacing.md),
+                DropdownButtonFormField<int>(
+                  initialValue: _bankId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Bank',
+                    prefixIcon: Icon(Icons.account_balance_outlined, size: 20),
+                  ),
+                  items: [
+                    for (final b in meta?.banks ?? const <NamedRef>[])
+                      DropdownMenuItem(value: b.id, child: Text(b.name)),
+                  ],
+                  onChanged: (v) => setState(() => _bankId = v),
+                ),
+              ],
+              if (_isCheque) ...[
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _chequeNo,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Cheque number',
+                    prefixIcon: Icon(Icons.receipt_outlined, size: 20),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                OutlinedButton.icon(
+                  onPressed: _pickChequeDate,
+                  icon: const Icon(Icons.event_outlined, size: 18),
+                  label: Text(
+                    _chequeDate == null
+                        ? 'Cheque date'
+                        : Format.date(_chequeDate),
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
 
               Text(
@@ -202,6 +308,41 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
     setState(() {});
   }
 
+  /// Keeps the tendered amount on the (recalculated) total after a discount or
+  /// remove-decimal change, so "amount due" and "tendered" stay in step.
+  void _syncTendered() {
+    _tendered.text = ref.read(cartProvider).grandTotal.toStringAsFixed(2);
+    setState(() {});
+  }
+
+  Future<void> _pickChequeDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _chequeDate ?? now,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 2),
+    );
+    if (picked != null) setState(() => _chequeDate = picked);
+  }
+
+  Widget _breakdownRow(ThemeData theme, String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 1),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        Text(value, style: theme.textTheme.bodySmall),
+      ],
+    ),
+  );
+
   /// Round-number suggestions above the total, for cash handling.
   List<double> _suggestions(double total) {
     final out = <double>[];
@@ -235,6 +376,9 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
                   : PaymentStatus.due.value),
         paidAmount: applied,
         paymentMethodId: _method!.id,
+        chequeNo: _isCheque ? _chequeNo.text.trim() : null,
+        chequeDate: _isCheque ? _chequeDate : null,
+        bankId: _isDeposit ? _bankId : null,
       );
 
       ref.read(cartProvider.notifier).clearLines();

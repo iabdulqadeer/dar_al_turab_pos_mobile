@@ -16,6 +16,7 @@ class CartLine {
     this.grossWeight = 0,
     this.wasteQty = 0,
     this.discount = 0,
+    this.taxRate = 0,
     this.batchId,
     this.imeiNumber,
     this.id,
@@ -85,6 +86,11 @@ class CartLine {
   double wasteQty;
   double discount;
 
+  /// Global sale tax rate (percent), applied to every line's net total. Comes
+  /// from `GET /settings/general` `data.tax`, not per-product, and is seeded by
+  /// the cart controller. 0 means no tax.
+  double taxRate;
+
   int? batchId;
   String? imeiNumber;
 
@@ -97,30 +103,19 @@ class CartLine {
   /// history attached to it.
   final int? id;
 
-  double get taxRate => product.pricing.taxRate;
+  /// Line net total: net weight (qty) × net unit price.
+  double get netTotal => _round(unitPrice * qty);
 
-  /// Tax for this line.
+  /// Tax for this line — exclusive, on the net total, at the global [taxRate].
   ///
-  /// Exclusive: added on top of price x qty.
-  /// Inclusive: extracted from a price that already contains it.
+  /// e.g. net 120 × 220 = 26,400, at 5% → 1,320.
   double get tax {
     if (taxRate <= 0) return 0;
-
-    if (product.pricing.isTaxInclusive) {
-      final net = unitPrice * 100 / (100 + taxRate);
-      return _round((unitPrice - net) * qty);
-    }
-
-    return _round(unitPrice * qty * taxRate / 100);
+    return _round(netTotal * taxRate / 100);
   }
 
   /// Line total, tax included — matches the web's `sub_total`.
-  double get subtotal {
-    if (product.pricing.isTaxInclusive) {
-      return _round(unitPrice * qty);
-    }
-    return _round(unitPrice * qty + tax);
-  }
+  double get subtotal => _round(netTotal + tax);
 
   /// True when the line would sell more than the warehouse holds. Advisory:
   /// the server is the authority and rejects with INSUFFICIENT_STOCK.
@@ -142,8 +137,15 @@ class CartLine {
     qty = _round(grossWeight - wasteQty);
   }
 
-  /// Keeps waste consistent when gross or net is edited by hand. The web form
-  /// does the same: waste is the raw difference between the two.
+  /// Derives net from the entered gross and waste: net = gross − waste.
+  /// The cashier enters Gross and Waste; Net is the computed output.
+  void syncNetFromWeights() {
+    qty = _round(grossWeight - wasteQty);
+    if (qty < 0) qty = 0;
+  }
+
+  /// Legacy inverse (waste = gross − net); retained for callers/tests that
+  /// still drive waste from an entered net.
   void syncWasteFromWeights() {
     wasteQty = _round(grossWeight - qty);
   }
@@ -158,6 +160,7 @@ class CartLine {
       grossWeight: grossWeight,
       wasteQty: wasteQty,
       discount: discount,
+      taxRate: taxRate,
       batchId: batchId,
       imeiNumber: imeiNumber,
       id: id,
@@ -266,6 +269,9 @@ class Cart {
     double paidAmount = 0,
     int? paymentMethodId,
     String? paymentNote,
+    String? chequeNo,
+    DateTime? chequeDate,
+    int? bankId,
     String? saleNote,
     bool isPos = true,
   }) {
@@ -290,6 +296,14 @@ class Cart {
         'payment': {
           'paid_by_id': paymentMethodId,
           'paid_amount': paidAmount,
+          // Cheque (id 4) carries its number/date; Deposit (id 6) a bank_id.
+          // NOTE: the server currently strips payment.bank_id on create
+          // (CreateSaleRequest), so the deposit bank won't persist until the
+          // backend adds that validation rule. Cheque fields persist today.
+          if (chequeNo != null && chequeNo.isNotEmpty) 'cheque_no': chequeNo,
+          if (chequeDate != null)
+            'cheque_date': chequeDate.toIso8601String().split('T').first,
+          'bank_id': ?bankId,
           if (paymentNote != null && paymentNote.isNotEmpty)
             'payment_note': paymentNote,
         },

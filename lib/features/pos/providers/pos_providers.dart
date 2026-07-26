@@ -9,6 +9,7 @@ import '../../../data/datasources/remote/sales_api.dart';
 import '../../../data/models/catalogue.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../branding/providers/branding_providers.dart';
 import '../../dashboard/providers/dashboard_providers.dart';
 import '../../sales/providers/sales_providers.dart';
 import '../domain/cart.dart';
@@ -25,6 +26,12 @@ final salePaymentsApiProvider = Provider<SalePaymentsApi>((ref) {
 /// payment methods do not change mid-shift.
 final saleFormMetadataProvider = FutureProvider<SaleFormMetadata>((ref) {
   return ref.watch(catalogueApiProvider).createForm();
+});
+
+/// Global sale tax rate (percent) from `GET /settings/general` `data.tax`,
+/// applied to every cart line's net total. 0 when unset or branding not loaded.
+final saleTaxRateProvider = Provider<double>((ref) {
+  return ref.watch(brandingProvider)?.tax ?? 0;
 });
 
 /// A plain mutable string, used for the two search boxes.
@@ -133,6 +140,16 @@ class CartController extends Notifier<Cart> {
       if (changed) _touch();
     });
 
+    // The tax rate is global (from branding/settings) and loads asynchronously;
+    // apply it to every line the moment it arrives or changes.
+    ref.listen(saleTaxRateProvider, (previous, next) {
+      if (previous == next || state.lines.isEmpty) return;
+      for (final line in state.lines) {
+        line.taxRate = next;
+      }
+      _touch();
+    });
+
     return Cart(lines: []);
   }
 
@@ -159,7 +176,9 @@ class CartController extends Notifier<Cart> {
     if (existing != null) {
       existing.qty = ((existing.qty + 1) * 100).roundToDouble() / 100;
     } else {
-      state.lines.add(CartLine.fromProduct(product));
+      state.lines.add(
+        CartLine.fromProduct(product)..taxRate = ref.read(saleTaxRateProvider),
+      );
     }
     _touch();
   }
@@ -229,6 +248,9 @@ final createSaleProvider = Provider<Future<SaleDetail> Function({
   double paidAmount,
   int? paymentMethodId,
   String? paymentNote,
+  String? chequeNo,
+  DateTime? chequeDate,
+  int? bankId,
   String? saleNote,
 })>((ref) {
   return ({
@@ -237,6 +259,9 @@ final createSaleProvider = Provider<Future<SaleDetail> Function({
     double paidAmount = 0,
     int? paymentMethodId,
     String? paymentNote,
+    String? chequeNo,
+    DateTime? chequeDate,
+    int? bankId,
     String? saleNote,
   }) async {
     final cart = ref.read(cartProvider);
@@ -247,6 +272,9 @@ final createSaleProvider = Provider<Future<SaleDetail> Function({
       paidAmount: paidAmount,
       paymentMethodId: paymentMethodId,
       paymentNote: paymentNote,
+      chequeNo: chequeNo,
+      chequeDate: chequeDate,
+      bankId: bankId,
       saleNote: saleNote,
     );
 

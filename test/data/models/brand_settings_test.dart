@@ -23,6 +23,12 @@ void main() {
     expect(brand.hasLogo, isTrue);
   });
 
+  test('parses the global tax rate as a number', () {
+    expect(BrandSettings.fromJson(json()..['tax'] = 5).tax, 5);
+    expect(BrandSettings.fromJson(json()..['tax'] = '7.5').tax, 7.5);
+    expect(BrandSettings.fromJson(json()).tax, isNull); // absent -> null
+  });
+
   test('prefers the legal company name for display', () {
     expect(
       BrandSettings.fromJson(json()).displayName,

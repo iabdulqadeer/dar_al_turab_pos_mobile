@@ -30,26 +30,31 @@ CatalogueProduct product({
 
 void main() {
   group('CartLine tax and subtotal', () {
-    test('adds exclusive tax on top of price x qty', () {
-      final line = CartLine.fromProduct(product())..qty = 10;
+    test('applies the global tax rate on top of net total', () {
+      // taxRate is now the global sale rate (from settings/general), seeded on
+      // the line, not read from the product.
+      final line = CartLine.fromProduct(product())
+        ..taxRate = 5
+        ..qty = 10;
 
       // 10 x 10 = 100, +5% = 5
       expect(line.tax, 5);
       expect(line.subtotal, 105);
     });
 
-    test('extracts inclusive tax from a price that already contains it', () {
-      final line = CartLine.fromProduct(
-        product(price: 10.5, taxMethod: 'inclusive'),
-      )..qty = 10;
+    test('matches the spec example: 120 x 220 at 5%', () {
+      final line = CartLine.fromProduct(product(price: 220))
+        ..taxRate = 5
+        ..qty = 120;
 
-      // 10.50 inclusive of 5%: net 10.00, so tax is 0.50 per unit.
-      expect(line.tax, closeTo(5.0, 0.01));
-      expect(line.subtotal, closeTo(105.0, 0.01));
+      expect(line.tax, 1320);
+      expect(line.subtotal, 120 * 220 + 1320);
     });
 
     test('is tax-free when the rate is zero', () {
-      final line = CartLine.fromProduct(product(taxRate: 0))..qty = 3;
+      final line = CartLine.fromProduct(product())
+        ..taxRate = 0
+        ..qty = 3;
 
       expect(line.tax, 0);
       expect(line.subtotal, 30);
@@ -76,14 +81,14 @@ void main() {
       expect(line.qty, 2.35);
     });
 
-    test('keeps waste as the difference when weights are edited by hand', () {
+    test('derives net from gross and waste (net = gross - waste)', () {
       final line = CartLine.fromProduct(product())
         ..grossWeight = 10
-        ..qty = 9.4;
+        ..wasteQty = 0.6;
 
-      line.syncWasteFromWeights();
+      line.syncNetFromWeights();
 
-      expect(line.wasteQty, closeTo(0.6, 0.001));
+      expect(line.qty, closeTo(9.4, 0.001));
     });
   });
 
@@ -150,8 +155,12 @@ void main() {
 
     test('sums line subtotals', () {
       final cart = cartWith([
-        CartLine.fromProduct(product())..qty = 10, // 105
-        CartLine.fromProduct(product())..qty = 5, // 52.50
+        CartLine.fromProduct(product())
+          ..taxRate = 5
+          ..qty = 10, // 105
+        CartLine.fromProduct(product())
+          ..taxRate = 5
+          ..qty = 5, // 52.50
       ]);
 
       expect(cart.subtotal, closeTo(157.5, 0.01));
@@ -159,16 +168,25 @@ void main() {
     });
 
     test('adds shipping and subtracts order discount', () {
-      final cart = cartWith([CartLine.fromProduct(product())..qty = 10])
-        ..shippingCost = 10
-        ..orderDiscount = 5;
+      final cart =
+          cartWith([
+            CartLine.fromProduct(product())
+              ..taxRate = 5
+              ..qty = 10,
+          ])
+            ..shippingCost = 10
+            ..orderDiscount = 5;
 
       expect(cart.grandTotal, closeTo(110, 0.01));
     });
 
     test('floors the grand total when remove_decimal_amount is set', () {
       final cart = Cart(
-        lines: [CartLine.fromProduct(product(price: 10.07))..qty = 10],
+        lines: [
+          CartLine.fromProduct(product(price: 10.07))
+            ..taxRate = 5
+            ..qty = 10,
+        ],
         removeDecimalAmount: true,
       );
 

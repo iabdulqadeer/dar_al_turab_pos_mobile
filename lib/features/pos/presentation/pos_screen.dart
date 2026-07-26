@@ -119,33 +119,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return;
     }
 
-    // Advisory only — the server is the authority and will reject with
-    // INSUFFICIENT_STOCK. Let the cashier decide, since stock records are
-    // frequently behind reality on the floor.
-    if (cart.hasStockIssue) {
-      final proceed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Not enough stock'),
-          content: const Text(
-            'One or more lines exceed the recorded stock for this warehouse. '
-            'The server may reject this sale.\n\nContinue anyway?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Go back'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
-      );
-      if (!(proceed ?? false)) return;
-    }
-
+    // No stock-availability gate (flutter_app_issues #6): the sale proceeds
+    // regardless of recorded stock, and the server no longer rejects on it.
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -426,31 +401,18 @@ class _ProductTile extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
-      subtitle: Row(
-        children: [
-          if (product.subtitle.isNotEmpty)
-            Flexible(
-              child: Text(
-                product.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+      // Stock badge intentionally removed (flutter_app_issues #1) — stock is
+      // no longer surfaced or checked in the sale flow.
+      subtitle: product.subtitle.isEmpty
+          ? null
+          : Text(
+              product.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            product.inStock
-                ? '${Format.quantity(product.stock)} ${product.unit?.name ?? ''}'
-                : 'Out of stock',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: product.inStock ? AppColors.success : AppColors.error,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -557,14 +519,6 @@ class _CartLineTile extends StatelessWidget {
               'Waste ${Format.quantity(line.wasteQty)}',
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          if (line.exceedsStock)
-            Text(
-              'Only ${Format.quantity(line.product.stock)} in stock',
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.error,
-                fontWeight: FontWeight.w700,
               ),
             ),
         ],
