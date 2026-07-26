@@ -27,16 +27,15 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The emblem is drawn on white, so on a dark surface it needs the
-    // mono-white variant or the black arcs and wordmark vanish.
-    final onDark = Theme.of(context).brightness == Brightness.dark;
-
+    // The splash is always light to match the native splash and the app's light
+    // default, so the colour emblem always sits on white and reads well.
     return Scaffold(
+      backgroundColor: AppColors.lightSurface,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            BrandLogo(width: 200, onDark: onDark),
+            const BrandLogo(width: 200, onDark: false),
             const SizedBox(height: AppSpacing.xl),
             const SizedBox(
               height: 24,

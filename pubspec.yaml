@@ -139,20 +139,17 @@ flutter_launcher_icons:
   remove_alpha_ios: true
 
 flutter_native_splash:
-  # The emblem is drawn on white, so a white splash keeps it consistent with
-  # the logo's native context. Dark mode uses the mono-white variant.
+  # Always light: the emblem is drawn on white and the app defaults to the light
+  # theme, so the splash stays white regardless of the phone's system theme (no
+  # dark variant, no dark->light flash on launch).
   color: "#FFFFFF"
   image: "assets/brand/splash.png"
-  color_dark: "#212120"
-  image_dark: "assets/brand/splash_dark.png"
 
   android_12:
     # Android 12+ crops the splash icon to a circle and ignores the image's own
     # padding, so it gets its own tighter asset budget.
     image: "assets/brand/splash.png"
     color: "#FFFFFF"
-    image_dark: "assets/brand/splash_dark.png"
-    color_dark: "#212120"
 
   android: true
   ios: true
