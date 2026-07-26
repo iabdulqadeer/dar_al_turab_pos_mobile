@@ -165,7 +165,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ? 'Enter your password'
                           : null,
                     ),
-                    const SizedBox(height: AppSpacing.lg),
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => context.push(Routes.forgotPassword),
+                        child: const Text('Forgot password?'),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
 
                     FilledButton(
                       onPressed: _submitting ? null : _submit,

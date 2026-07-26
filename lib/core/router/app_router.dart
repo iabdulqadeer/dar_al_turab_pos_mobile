@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/providers/auth_providers.dart';
+import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/branding/presentation/about_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/pos/presentation/edit_sale_screen.dart';
@@ -23,6 +25,10 @@ abstract final class Routes {
 
   /// Company / About page. Reachable signed out (from the login footer).
   static const about = '/about';
+
+  // Unauthenticated password-reset flow, reachable from the login screen.
+  static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
 
   // Bottom-navigation branches. Each is the root of its own stack.
   static const dashboard = '/dashboard';
@@ -64,6 +70,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.about,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: Routes.forgotPassword,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: Routes.resetPassword,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) {
+          // Email may arrive via extra (from the forgot screen) or a query
+          // param; either just prefills an editable field.
+          final email = (state.extra as String?) ??
+              state.uri.queryParameters['email'];
+          return ResetPasswordScreen(initialEmail: email);
+        },
       ),
       GoRoute(
         path: Routes.pos,
@@ -172,10 +194,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final signedIn = auth is AuthSignedIn;
 
       if (!signedIn) {
-        // About is public so it can be opened from the login footer.
-        return (location == Routes.login || location == Routes.about)
-            ? null
-            : Routes.login;
+        // These are public: About (login footer) and the password-reset flow.
+        const publicRoutes = {
+          Routes.login,
+          Routes.about,
+          Routes.forgotPassword,
+          Routes.resetPassword,
+        };
+        return publicRoutes.contains(location) ? null : Routes.login;
       }
 
       if (location == Routes.login || location == Routes.splash) {

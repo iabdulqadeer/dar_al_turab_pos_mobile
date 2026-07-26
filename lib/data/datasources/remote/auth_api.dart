@@ -48,6 +48,39 @@ class AuthApi {
   Future<void> logout() =>
       _client.post('v1/auth/logout', parse: (_) {});
 
+  /// `POST /v1/auth/forgot-password` — unauthenticated.
+  ///
+  /// Always succeeds with a generic message when the address is well-formed
+  /// (enumeration-safe): a `200` does not confirm the email is registered.
+  /// Throws [ApiException] for `422` (validation), `429`
+  /// (`TOO_MANY_ATTEMPTS`) or `503` (`EMAIL_NOT_CONFIGURED`).
+  Future<void> forgotPassword({required String email}) => _client.post(
+    'v1/auth/forgot-password',
+    body: {'email': email},
+    parse: (_) {},
+  );
+
+  /// `POST /v1/auth/reset-password` — unauthenticated.
+  ///
+  /// Completes the reset with the [token] copied from the emailed link. On
+  /// success the server revokes every existing token for the account, so all
+  /// devices must sign in again. Throws [ApiException] with `INVALID_TOKEN`
+  /// (invalid/expired/reused), `INVALID_USER`, or `VALIDATION_ERROR`.
+  Future<void> resetPassword({
+    required String email,
+    required String token,
+    required String password,
+  }) => _client.post(
+    'v1/auth/reset-password',
+    body: {
+      'email': email,
+      'token': token,
+      'password': password,
+      'password_confirmation': password,
+    },
+    parse: (_) {},
+  );
+
   /// `GET /v1/auth/me`
   Future<AuthUser> me() => _client.get(
     'v1/auth/me',

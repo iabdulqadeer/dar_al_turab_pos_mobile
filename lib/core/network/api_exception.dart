@@ -50,6 +50,11 @@ abstract final class ApiErrorCode {
   static const forbidden = 'FORBIDDEN';
   static const invalidCurrentPassword = 'INVALID_CURRENT_PASSWORD';
 
+  // Password reset (unauthenticated)
+  static const invalidToken = 'INVALID_TOKEN';
+  static const invalidUser = 'INVALID_USER';
+  static const emailNotConfigured = 'EMAIL_NOT_CONFIGURED';
+
   // Routing
   static const notFound = 'NOT_FOUND';
   static const endpointNotFound = 'ENDPOINT_NOT_FOUND';
