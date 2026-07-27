@@ -13,6 +13,7 @@ import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../branding/providers/branding_providers.dart';
+import '../../sales/presentation/widgets/sale_row_menu.dart';
 import '../providers/dashboard_providers.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -353,24 +354,30 @@ class _RecentSaleTile extends StatelessWidget {
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              Format.amount(sale.grandTotal),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (sale.hasDue)
-              Text(
-                'Due ${Format.amount(sale.due)}',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: AppColors.error,
-                  fontWeight: FontWeight.w700,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  Format.amount(sale.grandTotal),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
+                if (sale.hasDue)
+                  Text(
+                    'Due ${Format.amount(sale.due)}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+            SaleRowMenu(sale: sale),
           ],
         ),
       ),

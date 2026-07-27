@@ -9,6 +9,8 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../../../data/models/sale_status.dart';
+import '../../../printing/printer_transport.dart';
+import '../../../printing/providers/print_job_providers.dart';
 import '../../providers/pos_providers.dart';
 
 /// Takes payment and submits the sale.
@@ -26,7 +28,15 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
   PaymentMethodOption? _method;
   int? _bankId;
   DateTime? _chequeDate;
+  // How the sale is being settled. Drives whether a payment is taken now; the
+  // server derives the final payment_status from paid_amount vs grand_total.
+  PaymentStatus _status = PaymentStatus.paid;
   bool _submitting = false;
+
+  bool get _isDue => _status == PaymentStatus.due;
+
+  /// Due needs no method; Partial/Paid need one chosen.
+  bool get _canSubmit => !_submitting && (_isDue || _method != null);
 
   @override
   void initState() {
@@ -148,14 +158,59 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
               ),
               const Divider(height: AppSpacing.xl),
 
+              // Payment status drives whether a payment is taken now; the server
+              // derives the final status from paid_amount vs grand_total.
               Text(
-                'Payment method',
+                'Payment status',
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
-              // Only methods the server marks enabled are offered. Points (7)
+              const SizedBox(height: AppSpacing.xs),
+              DropdownButtonFormField<PaymentStatus>(
+                initialValue: _status,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixIcon: Icon(Icons.fact_check_outlined, size: 20),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: PaymentStatus.due,
+                    child: Text('Due (pay later)'),
+                  ),
+                  DropdownMenuItem(
+                    value: PaymentStatus.partial,
+                    child: Text('Partial'),
+                  ),
+                  DropdownMenuItem(
+                    value: PaymentStatus.paid,
+                    child: Text('Paid'),
+                  ),
+                ],
+                onChanged: (s) {
+                  if (s == null) return;
+                  setState(() {
+                    _status = s;
+                    if (s == PaymentStatus.paid) {
+                      _tendered.text = total.toStringAsFixed(2);
+                    }
+                  });
+                },
+              ),
+
+              // Due = nothing paid now: no method, amount, or payment block.
+              if (!_isDue) ...[
+                const Divider(height: AppSpacing.xl),
+
+                Text(
+                  'Payment method',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                // Only methods the server marks enabled are offered. Points (7)
               // is always disabled — POST /sales rejects it outright.
               Wrap(
                 spacing: AppSpacing.sm,
@@ -211,90 +266,106 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
               ],
               const SizedBox(height: AppSpacing.lg),
 
-              Text(
-                'Amount tendered',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              TextField(
-                controller: _tendered,
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                ],
-                onChanged: (_) => setState(() {}),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: const InputDecoration(isDense: true),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              Wrap(
-                spacing: AppSpacing.sm,
-                children: [
-                  _QuickAmount(
-                    label: 'Exact',
-                    onTap: () => _setAmount(total),
+                Text(
+                  'Paid amount',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  for (final v in _suggestions(total))
-                    _QuickAmount(
-                      label: Format.amount(v),
-                      onTap: () => _setAmount(v),
-                    ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: (change >= 0 ? AppColors.success : AppColors.warning)
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
                 ),
-                child: Row(
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: _tendered,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  decoration: const InputDecoration(isDense: true),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+
+                Wrap(
+                  spacing: AppSpacing.sm,
                   children: [
-                    Expanded(
-                      child: Text(
-                        change >= 0 ? 'Change due' : 'Remaining balance',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ),
-                    Text(
-                      Format.amount(change.abs()),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: change >= 0
-                            ? AppColors.success
-                            : AppColors.warning,
-                      ),
+                    _QuickAmount(
+                      label: 'Exact',
+                      onTap: () => _setAmount(total),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
+                const SizedBox(height: AppSpacing.lg),
 
-              SizedBox(
-                width: double.infinity,
-                height: AppSpacing.minTouchTarget,
-                child: FilledButton.icon(
-                  onPressed: _submitting || _method == null ? null : _submit,
-                  icon: _submitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check_circle_outline),
-                  label: Text(
-                    _submitting ? 'Saving sale…' : 'Complete sale',
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: (change >= 0 ? AppColors.success : AppColors.warning)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          change >= 0 ? 'Change due' : 'Remaining balance',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      Text(
+                        Format.amount(change.abs()),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: change >= 0
+                              ? AppColors.success
+                              : AppColors.warning,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+
+              // Save just records the sale; Save & Print also prints the
+              // receipt on success (a print failure never rolls back the sale).
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _canSubmit ? () => _submit(print: false) : null,
+                      icon: const Icon(Icons.save_outlined, size: 18),
+                      label: const Text('Save'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(
+                          AppSpacing.minTouchTarget,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: SizedBox(
+                      height: AppSpacing.minTouchTarget,
+                      child: FilledButton.icon(
+                        onPressed: _canSubmit
+                            ? () => _submit(print: true)
+                            : null,
+                        icon: _submitting
+                            ? const SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.print_outlined, size: 18),
+                        label: Text(_submitting ? 'Saving…' : 'Save & Print'),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -343,24 +414,13 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
     ),
   );
 
-  /// Round-number suggestions above the total, for cash handling.
-  List<double> _suggestions(double total) {
-    final out = <double>[];
-    for (final step in [10, 50, 100, 500]) {
-      final v = (total / step).ceil() * step.toDouble();
-      if (v > total && !out.contains(v)) out.add(v);
-    }
-    return out.take(3).toList();
-  }
-
-  Future<void> _submit() async {
+  Future<void> _submit({required bool print}) async {
     final cart = ref.read(cartProvider);
     final total = cart.grandTotal;
 
-    // Never send more than the invoice as paid: the server treats any
-    // mismatch — including an overpayment — as "due", so the sale would be
-    // recorded unpaid. Change is physical cash, not part of the invoice.
-    final applied = _paid > total ? total : _paid;
+    // Due: nothing paid now, no payment block. Otherwise the entered amount,
+    // capped at the invoice (an overpaying cash tender is change, not paid).
+    final applied = _isDue ? 0.0 : (_paid > total ? total : _paid);
 
     setState(() => _submitting = true);
 
@@ -369,30 +429,41 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
         saleStatus: SaleStatus.completed.value,
         // The server recomputes this for POS sales anyway; send our best
         // guess so a non-POS path still records it sensibly.
-        paymentStatus: applied >= total - 0.005
-            ? PaymentStatus.paid.value
-            : (applied > 0
-                  ? PaymentStatus.partial.value
-                  : PaymentStatus.due.value),
+        paymentStatus: _status.value,
         paidAmount: applied,
-        paymentMethodId: _method!.id,
-        chequeNo: _isCheque ? _chequeNo.text.trim() : null,
-        chequeDate: _isCheque ? _chequeDate : null,
-        bankId: _isDeposit ? _bankId : null,
+        paymentMethodId: _isDue ? null : _method!.id,
+        chequeNo: _isDue ? null : (_isCheque ? _chequeNo.text.trim() : null),
+        chequeDate: _isDue ? null : (_isCheque ? _chequeDate : null),
+        bankId: _isDue ? null : (_isDeposit ? _bankId : null),
       );
+
+      // Save & Print: print the fresh sale before leaving. Best-effort so a
+      // print failure warns but never rolls back the saved sale.
+      String? printWarning;
+      if (print) {
+        try {
+          await ref.read(printSaleReceiptProvider)(sale.id);
+        } on PrintException catch (e) {
+          printWarning = 'Saved, but printing failed: ${e.message} ${e.remedy}';
+        } on ApiException catch (e) {
+          printWarning = 'Saved, but printing failed: ${e.message}';
+        }
+      }
 
       ref.read(cartProvider.notifier).clearLines();
 
       if (!mounted) return;
       Navigator.pop(context);
-
-      // Straight to the sale so the cashier can print the receipt.
       context.push('${Routes.sales}/${sale.id}');
 
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
-          SnackBar(content: Text('Sale ${sale.referenceNo} created.')),
+          SnackBar(
+            content: Text(printWarning ?? 'Sale ${sale.referenceNo} created.'),
+            backgroundColor: printWarning != null ? AppColors.warning : null,
+            duration: Duration(seconds: printWarning != null ? 6 : 4),
+          ),
         );
     } on ApiException catch (e) {
       if (!mounted) return;

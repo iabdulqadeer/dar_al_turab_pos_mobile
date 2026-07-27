@@ -13,6 +13,7 @@ import '../../../data/models/sale.dart';
 import '../../../data/models/sale_status.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../providers/sales_providers.dart';
+import 'widgets/sale_row_menu.dart';
 import 'widgets/status_chip.dart';
 
 class SalesListScreen extends ConsumerStatefulWidget {
@@ -352,6 +353,7 @@ class _SaleCard extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
+                  SaleRowMenu(sale: sale),
                 ],
               ),
               const SizedBox(height: AppSpacing.xs),

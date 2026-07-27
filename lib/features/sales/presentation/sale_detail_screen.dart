@@ -12,6 +12,7 @@ import '../../auth/providers/auth_providers.dart';
 import '../../dashboard/providers/dashboard_providers.dart';
 import '../../pos/providers/pos_providers.dart';
 import '../../printing/printer_transport.dart';
+import '../../printing/providers/print_job_providers.dart';
 import '../../printing/providers/printer_providers.dart';
 import '../providers/sales_providers.dart';
 import 'receipt_preview_screen.dart';
@@ -251,46 +252,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   Future<void> _print() async {
-    final unsupported = ref.read(printingUnsupportedReasonProvider);
-    if (unsupported != null) {
-      _showMessage(unsupported, isError: true);
-      return;
-    }
-
-    final printerState = ref.read(printerControllerProvider);
-    if (!printerState.hasPrinter) {
-      _showMessage(
-        'No printer paired. Set one up in Printer settings first.',
-        isError: true,
-      );
-      return;
-    }
-
     setState(() => _printing = true);
-
     try {
-      // Reconnect first: Bluetooth links drop when the phone sleeps, and a
-      // stale "connected" flag would otherwise fail mid-print.
-      await ref.read(printerControllerProvider.notifier).reconnect();
-
-      final saved = printerState.saved!;
-      // Ask the server to lay the body out at the centred content width, then
-      // print it shifted right by the margin so both sides have room.
-      final document = await ref
-          .read(salesApiProvider)
-          .receipt(widget.saleId, charactersPerLine: saved.contentWidth);
-
-      await ref
-          .read(receiptPrinterProvider)
-          .printReceipt(
-            document,
-            copies: _receiptCopies,
-            contentWidth: saved.contentWidth,
-            leftMargin: saved.leftMargin,
-          );
-
-      if (!mounted) return;
-      _showMessage('Receipt sent to ${saved.name}.');
+      await ref.read(printSaleReceiptProvider)(
+        widget.saleId,
+        copies: _receiptCopies,
+      );
+      if (mounted) _showMessage('Receipt sent.');
     } on PrintException catch (e) {
       if (mounted) _showMessage('${e.message} ${e.remedy}', isError: true);
     } on ApiException catch (e) {

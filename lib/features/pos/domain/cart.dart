@@ -204,7 +204,7 @@ class Cart {
     this.biller,
     this.orderDiscount = 0,
     this.shippingCost = 0,
-    this.removeDecimalAmount = true,
+    this.removeDecimalAmount = false,
   });
 
   final List<CartLine> lines;
@@ -213,8 +213,8 @@ class Cart {
   double orderDiscount;
   double shippingCost;
 
-  /// Floors the grand total to a whole number. Defaults true, matching the
-  /// server's own default for this deployment.
+  /// Floors the grand total to a whole number. Defaults off — the cashier opts
+  /// in per sale via the payment sheet's "Remove decimal" toggle.
   bool removeDecimalAmount;
 
   bool get isEmpty => lines.isEmpty;
