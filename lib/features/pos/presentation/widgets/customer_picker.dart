@@ -8,8 +8,14 @@ import '../../../../data/models/catalogue.dart';
 import '../../providers/pos_providers.dart';
 
 /// Customer search + inline create, for the sale screen.
+///
+/// By default the picked customer is written to the global New-Sale cart. Pass
+/// [onSelected] to route the choice somewhere else instead — the Edit Sale
+/// screen drives a local cart, so it supplies its own handler.
 class CustomerPicker extends ConsumerStatefulWidget {
-  const CustomerPicker({super.key});
+  const CustomerPicker({this.onSelected, super.key});
+
+  final void Function(CatalogueCustomer customer)? onSelected;
 
   @override
   ConsumerState<CustomerPicker> createState() => _CustomerPickerState();
@@ -22,6 +28,18 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
   void dispose() {
     _search.dispose();
     super.dispose();
+  }
+
+  /// Applies the choice: to the caller's handler when given, otherwise to the
+  /// global cart. Either way the sheet closes.
+  void _pick(CatalogueCustomer customer) {
+    final onSelected = widget.onSelected;
+    if (onSelected != null) {
+      onSelected(customer);
+    } else {
+      ref.read(cartProvider.notifier).setCustomer(customer);
+    }
+    Navigator.pop(context);
   }
 
   @override
@@ -120,10 +138,7 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                            onTap: () {
-                              ref.read(cartProvider.notifier).setCustomer(c);
-                              Navigator.pop(context);
-                            },
+                            onTap: () => _pick(c),
                           );
                         },
                       ),
@@ -143,8 +158,7 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
     );
 
     if (created != null && mounted) {
-      ref.read(cartProvider.notifier).setCustomer(created);
-      Navigator.pop(context);
+      _pick(created);
     }
   }
 }

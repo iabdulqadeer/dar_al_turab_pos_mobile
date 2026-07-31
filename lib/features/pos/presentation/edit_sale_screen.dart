@@ -6,11 +6,14 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/catalogue.dart';
 import '../../../data/models/sale.dart';
+import '../../branding/providers/branding_providers.dart';
 import '../../dashboard/providers/dashboard_providers.dart';
 import '../../sales/providers/sales_providers.dart';
 import '../domain/cart.dart';
 import '../providers/pos_providers.dart';
 import 'widgets/cart_line_editor.dart';
+import 'widgets/customer_picker.dart';
+import 'widgets/product_search_sheet.dart';
 
 /// Loads a sale's edit form and lets its lines be corrected.
 ///
@@ -38,6 +41,12 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
   @override
   void initState() {
     super.initState();
+    // Pull the global tax rate fresh from /settings/general, same as the New
+    // Sale screen, so lines are re-taxed at the current rate while editing.
+    // Best-effort; the saleTaxRateProvider listener applies it when it lands.
+    Future.microtask(
+      () => ref.read(brandingProvider.notifier).refresh(),
+    );
     _load();
   }
 
@@ -53,14 +62,19 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
           .editForm(widget.saleId);
       final sale = SaleDetail.fromJson(form.saleJson);
 
+      // Re-tax every line at the current global rate (from /settings/general),
+      // rather than the rate frozen on the sale — so an edit recalculates tax
+      // exactly like the New Sale screen does.
+      final taxRate = ref.read(saleTaxRateProvider);
+
       setState(() {
-        // form.metadata carries billers, banks and payment methods. This
-        // screen edits lines only — the sale's own customer and biller come
-        // from the sale itself — so the bundle is deliberately unused.
+        // form.metadata carries billers, banks and payment methods. The sale's
+        // own customer and biller come from the sale itself, so that part of
+        // the bundle is unused; products are searched live when adding a line.
         _sale = sale;
         _cart = Cart(
           lines: sale.items
-              .map((i) => CartLine.fromSaleItem(i))
+              .map((i) => CartLine.fromSaleItem(i)..taxRate = taxRate)
               .toList(),
           // The sale's own customer and biller, rebuilt from the detail so
           // the header reads correctly without a second lookup.
@@ -100,6 +114,18 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
   Widget build(BuildContext context) {
     final cart = _cart;
 
+    // When the fresh tax rate lands after the sale has loaded, re-tax the
+    // existing lines so the totals reflect it without a reload.
+    ref.listen(saleTaxRateProvider, (previous, next) {
+      final current = _cart;
+      if (current == null) return;
+      setState(() {
+        for (final line in current.lines) {
+          line.taxRate = next;
+        }
+      });
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -116,6 +142,13 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
       bottomNavigationBar: cart == null || _loadError != null
           ? null
           : _SaveBar(cart: cart, saving: _saving, onSave: _save),
+      floatingActionButton: cart == null || _loadError != null
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _addProduct(cart),
+              tooltip: 'Add item',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 
@@ -124,30 +157,45 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
 
     return Column(
       children: [
-        Container(
-          width: double.infinity,
+        Material(
           color: AppColors.primary.withValues(alpha: 0.06),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                cart.customer?.name ?? '-',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+          child: InkWell(
+            onTap: () => _changeCustomer(cart),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
               ),
-              Text(
-                'Paid ${Format.amount(_sale!.totals.paidAmount)}'
-                '  ·  editing lines only',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 18),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cart.customer?.name ?? 'Choose a customer',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Paid ${Format.amount(_sale!.totals.paidAmount)}'
+                          '  ·  tap to change customer',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.expand_more, size: 20),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         if (cart.isEmpty)
@@ -227,8 +275,38 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
     );
 
     if (edited != null) {
+      // Keep the line on the current global rate; the edited copy carries
+      // whatever rate it was opened with.
+      edited.taxRate = ref.read(saleTaxRateProvider);
       setState(() => cart.lines[index] = edited);
     }
+  }
+
+  /// Swaps the sale's customer, reusing the New Sale picker against this
+  /// screen's local cart.
+  Future<void> _changeCustomer(Cart cart) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CustomerPicker(
+        onSelected: (customer) => setState(() => cart.customer = customer),
+      ),
+    );
+  }
+
+  /// Appends a new line via the shared product search, seeding it with the
+  /// current tax rate. The sheet stays open so several items can be added.
+  Future<void> _addProduct(Cart cart) async {
+    final rate = ref.read(saleTaxRateProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => ProductSearchSheet(
+        onSelected: (product) => setState(
+          () => cart.lines.add(CartLine.fromProduct(product)..taxRate = rate),
+        ),
+      ),
+    );
   }
 
   Future<void> _save() async {

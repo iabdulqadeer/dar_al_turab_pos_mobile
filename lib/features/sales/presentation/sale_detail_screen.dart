@@ -8,6 +8,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
+import '../../../data/models/sale_status.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../dashboard/providers/dashboard_providers.dart';
 import '../../pos/providers/pos_providers.dart';
@@ -95,6 +96,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     final user = ref.watch(currentUserProvider);
     final canEdit = user?.can(Permissions.salesEdit) ?? false;
     final canDelete = user?.can(Permissions.salesDelete) ?? false;
+    // Editing lines is allowed only while the sale still owes money; a Paid
+    // sale is locked even for a permitted user. "Add payment" keeps its own
+    // permission-only gate.
+    final canEditLines = canEdit && sale.paymentStatus == PaymentStatus.due;
 
     // Never render a menu whose every entry would 403.
     if (!canEdit && !canDelete) return const SizedBox.shrink();
@@ -107,7 +112,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
         _ => null,
       },
       itemBuilder: (context) => [
-        if (canEdit)
+        if (canEditLines)
           const PopupMenuItem(
             value: 'edit',
             child: ListTile(

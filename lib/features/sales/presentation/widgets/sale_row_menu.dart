@@ -7,6 +7,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/auth_user.dart';
 import '../../../../data/models/sale.dart';
+import '../../../../data/models/sale_status.dart';
 import '../../../auth/providers/auth_providers.dart';
 import '../../../dashboard/providers/dashboard_providers.dart';
 import '../../../printing/printer_transport.dart';
@@ -24,7 +25,11 @@ class SaleRowMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final canEdit = user?.can(Permissions.salesEdit) ?? false;
+    // Edit is offered only for sales that still owe money (payment_status Due).
+    // Once a sale is Paid, its lines are locked even for a permitted user.
+    final canEdit =
+        (user?.can(Permissions.salesEdit) ?? false) &&
+        sale.paymentStatus == PaymentStatus.due;
     final canDelete = user?.can(Permissions.salesDelete) ?? false;
 
     return PopupMenuButton<String>(
