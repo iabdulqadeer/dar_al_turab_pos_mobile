@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_form.dart';
 import '../../../../data/models/catalogue.dart';
@@ -70,7 +72,12 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
                   TextButton.icon(
                     onPressed: _createCustomer,
                     icon: const Icon(Icons.person_add_alt, size: 18),
-                    label: const Text('New'),
+                    label: const Text('Quick'),
+                  ),
+                  TextButton.icon(
+                    onPressed: _fullCreate,
+                    icon: const Icon(Icons.assignment_ind_outlined, size: 18),
+                    label: const Text('Full'),
                   ),
                 ],
               ),
@@ -157,6 +164,15 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
       builder: (_) => const _QuickCreateCustomerSheet(),
     );
 
+    if (created != null && mounted) {
+      _pick(created);
+    }
+  }
+
+  /// Opens the fuller "Add Customer" screen. It returns the created customer on
+  /// pop, which we then apply to the sale just like a picked one.
+  Future<void> _fullCreate() async {
+    final created = await context.push<CatalogueCustomer>(Routes.addCustomer);
     if (created != null && mounted) {
       _pick(created);
     }

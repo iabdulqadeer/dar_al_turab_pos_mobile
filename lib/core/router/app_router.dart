@@ -7,6 +7,7 @@ import '../../features/auth/providers/auth_providers.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/branding/presentation/about_screen.dart';
+import '../../features/customers/presentation/add_customer_screen.dart';
 import '../../features/dashboard/presentation/dashboard_screen.dart';
 import '../../features/pos/presentation/edit_sale_screen.dart';
 import '../../features/pos/presentation/pos_screen.dart';
@@ -39,6 +40,10 @@ abstract final class Routes {
   /// Pushed over the shell rather than being a tab — a sale in progress
   /// should not be interrupted by bottom-bar navigation.
   static const pos = '/pos';
+
+  /// Full "Add Customer" form, pushed over the shell (typically from the sale
+  /// screen's customer picker). Returns the created customer on pop.
+  static const addCustomer = '/customers/new';
 
   // Pushed on top of the profile branch.
   static const editProfile = '/profile/edit';
@@ -91,6 +96,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: Routes.pos,
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) => const PosScreen(),
+      ),
+      GoRoute(
+        path: Routes.addCustomer,
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AddCustomerScreen(),
       ),
 
       // Each branch keeps its own navigator, so a tab's stack and scroll
