@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_form.dart';
+import '../../../core/widgets/app_message.dart';
 import '../providers/auth_providers.dart';
 
 /// Step 1 of the unauthenticated reset flow: request a reset link by email.
@@ -196,14 +197,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    showAppMessage(context, message, kind: AppMessageKind.error);
   }
 }

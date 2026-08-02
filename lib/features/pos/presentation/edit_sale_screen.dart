@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/extensions/formatting.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../data/models/catalogue.dart';
 import '../../../data/models/sale.dart';
 import '../../branding/providers/branding_providers.dart';
@@ -339,8 +340,10 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
       ref.invalidate(dashboardRecentProvider);
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      // Toast before popping so it shows via the still-mounted context; the
+      // root-overlay message persists after this screen leaves.
       _toast('Sale ${sale.referenceNo} updated.');
+      Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -361,14 +364,11 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
   }
 
   void _toast(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? AppColors.error : null,
-        ),
-      );
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.success,
+    );
   }
 }
 

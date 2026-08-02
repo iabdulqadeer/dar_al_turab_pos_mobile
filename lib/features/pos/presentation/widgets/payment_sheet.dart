@@ -7,6 +7,7 @@ import '../../../../core/extensions/formatting.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_message.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../../../data/models/sale_status.dart';
 import '../../../printing/printer_transport.dart';
@@ -453,31 +454,21 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
       ref.read(cartProvider.notifier).clearLines();
 
       if (!mounted) return;
+      // Show before popping: the toast lives in the root overlay, so it stays
+      // visible over the sheet and through the navigation that follows.
+      showAppMessage(
+        context,
+        printWarning ?? 'Sale ${sale.referenceNo} created.',
+        kind: printWarning != null
+            ? AppMessageKind.warning
+            : AppMessageKind.success,
+      );
       Navigator.pop(context);
       context.push('${Routes.sales}/${sale.id}');
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(printWarning ?? 'Sale ${sale.referenceNo} created.'),
-            backgroundColor: printWarning != null ? AppColors.warning : null,
-            duration: Duration(seconds: printWarning != null ? 6 : 4),
-          ),
-        );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(_messageFor(e)),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 6),
-          ),
-        );
+      showAppMessage(context, _messageFor(e), kind: AppMessageKind.error);
     }
   }
 

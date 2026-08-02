@@ -49,4 +49,42 @@ class NativeBluetooth {
       );
     }).where((d) => d.address.isNotEmpty).toList(growable: false);
   }
+
+  /// Whether the Bluetooth adapter is currently on. Safe on any platform —
+  /// returns false when the channel is unavailable.
+  Future<bool> isBluetoothOn() async {
+    try {
+      return await _channel.invokeMethod<bool>('isBluetoothOn') ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Asks the OS to turn Bluetooth on, showing the system consent dialog. The
+  /// result arrives asynchronously via the app resuming, so callers should
+  /// re-read [isBluetoothOn] on resume rather than trusting an immediate value.
+  Future<void> requestEnable() async {
+    await _channel.invokeMethod<void>('requestEnable');
+  }
+
+  /// Attempts to turn Bluetooth off. Returns the native status:
+  /// `'disabled'` (turned off), `'already_off'`, or `'unsupported'` (blocked by
+  /// the OS on Android 13+, where the caller should [openSettings] instead).
+  Future<String> disable() async {
+    try {
+      return await _channel.invokeMethod<String>('disable') ?? 'unsupported';
+    } on PlatformException {
+      return 'unsupported';
+    } on MissingPluginException {
+      return 'unsupported';
+    }
+  }
+
+  /// Opens the system Bluetooth settings — the fallback for turning Bluetooth
+  /// off where the app is not allowed to.
+  Future<void> openSettings() async {
+    await _channel.invokeMethod<void>('openSettings');
+  }
 }

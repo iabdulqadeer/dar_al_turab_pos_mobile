@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../data/models/receipt.dart';
 import '../../printing/escpos_encoder.dart';
 import '../../printing/printer_transport.dart';
@@ -132,14 +133,11 @@ class _ReceiptPreviewScreenState extends ConsumerState<ReceiptPreviewScreen> {
   }
 
   void _toast(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? AppColors.error : null,
-        ),
-      );
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.success,
+    );
   }
 
   @override

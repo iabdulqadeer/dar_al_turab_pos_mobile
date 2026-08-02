@@ -6,7 +6,9 @@ import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../branding/presentation/brand_logo.dart';
+import '../../branding/presentation/developer_credit.dart';
 import '../../branding/providers/branding_providers.dart';
 import '../providers/auth_providers.dart';
 
@@ -261,8 +263,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(authControllerProvider.notifier)
           .setBaseUrl(controller.text);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Server address updated.')),
+        showAppMessage(
+          context,
+          'Server address updated.',
+          kind: AppMessageKind.success,
         );
       }
     }
@@ -302,7 +306,6 @@ class _Footer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final brand = ref.watch(brandingProvider);
 
     return Padding(
@@ -315,12 +318,7 @@ class _Footer extends ConsumerWidget {
             icon: const Icon(Icons.info_outline, size: 18),
             label: const Text('About'),
           ),
-          Text(
-            'Developed by ${brand?.developedBy ?? 'KAF Sols.'}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
+          DeveloperCredit(name: brand?.developedBy ?? 'KAF Sols.'),
         ],
       ),
     );

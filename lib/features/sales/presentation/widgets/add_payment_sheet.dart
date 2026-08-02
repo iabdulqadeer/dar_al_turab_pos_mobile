@@ -6,6 +6,7 @@ import '../../../../core/extensions/formatting.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_form.dart';
+import '../../../../core/widgets/app_message.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../../../data/models/sale.dart';
 import '../../../pos/providers/pos_providers.dart';
@@ -248,15 +249,7 @@ class _AddPaymentSheetState extends ConsumerState<AddPaymentSheet> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+      showAppMessage(context, e.message, kind: AppMessageKind.error);
     }
   }
 }

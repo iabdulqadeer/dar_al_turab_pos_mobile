@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_message.dart';
 import '../../../../data/models/auth_user.dart';
 import '../../../../data/models/sale.dart';
 import '../../../../data/models/sale_status.dart';
@@ -77,24 +78,25 @@ class SaleRowMenu extends ConsumerWidget {
   }
 
   Future<void> _print(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Printing…')));
+    // Capture the overlay before the await so no BuildContext is used across it.
+    final overlay = Overlay.of(context, rootOverlay: true);
+    showAppMessageOn(overlay, 'Printing…');
     try {
       await ref.read(printSaleReceiptProvider)(sale.id);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Receipt sent.')));
+      showAppMessageOn(overlay, 'Receipt sent.', kind: AppMessageKind.success);
     } on PrintException catch (e) {
-      _error(messenger, '${e.message} ${e.remedy}');
+      showAppMessageOn(
+        overlay,
+        '${e.message} ${e.remedy}',
+        kind: AppMessageKind.error,
+      );
     } on ApiException catch (e) {
-      _error(messenger, e.message);
+      showAppMessageOn(overlay, e.message, kind: AppMessageKind.error);
     }
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
+    final overlay = Overlay.of(context, rootOverlay: true);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -123,25 +125,13 @@ class SaleRowMenu extends ConsumerWidget {
       ref.invalidate(salesListProvider);
       ref.invalidate(dashboardRecentProvider);
       ref.invalidate(saleDetailProvider(sale.id));
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('Sale ${sale.referenceNo} deleted.')),
-        );
-    } on ApiException catch (e) {
-      _error(messenger, e.message);
-    }
-  }
-
-  void _error(ScaffoldMessengerState messenger, String message) {
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 5),
-        ),
+      showAppMessageOn(
+        overlay,
+        'Sale ${sale.referenceNo} deleted.',
+        kind: AppMessageKind.success,
       );
+    } on ApiException catch (e) {
+      showAppMessageOn(overlay, e.message, kind: AppMessageKind.error);
+    }
   }
 }

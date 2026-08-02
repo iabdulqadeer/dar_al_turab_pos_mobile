@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_form.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../auth/providers/auth_providers.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -146,10 +147,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       await ref.read(authControllerProvider.notifier).refreshUser();
 
       if (!mounted) return;
+      // Show before popping so the message uses the still-mounted context; it
+      // lives in the root overlay and persists after this screen leaves.
+      showAppMessage(context, 'Profile updated.', kind: AppMessageKind.success);
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Profile updated.')));
     } on ApiException catch (e) {
       if (!mounted) return;
 
@@ -177,15 +178,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    showAppMessage(context, message, kind: AppMessageKind.error);
   }
 }
 

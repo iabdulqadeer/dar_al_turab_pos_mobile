@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_form.dart';
+import '../../../core/widgets/app_message.dart';
 import '../providers/auth_providers.dart';
 
 /// Step 2 of the reset flow: set a new password using the token from the
@@ -155,14 +156,14 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
           );
 
       if (!mounted) return;
+      // Show before navigating away so the message uses the still-mounted
+      // context; the root-overlay toast persists onto the login screen.
+      showAppMessage(
+        context,
+        'Password updated. Sign in with your new password.',
+        kind: AppMessageKind.success,
+      );
       context.go(Routes.login);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Password updated. Sign in with your new password.'),
-          ),
-        );
     } on ApiException catch (e) {
       if (!mounted) return;
 
@@ -221,14 +222,6 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    showAppMessage(context, message, kind: AppMessageKind.error);
   }
 }

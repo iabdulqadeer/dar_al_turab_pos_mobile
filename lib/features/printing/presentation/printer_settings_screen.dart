@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../core/widgets/app_overflow_menu.dart';
 import '../../../data/models/receipt.dart';
 import '../escpos_encoder.dart';
+import '../native_bluetooth.dart';
 import '../printer_transport.dart';
 import '../providers/printer_providers.dart';
 import '../receipt_printer.dart';
@@ -19,23 +21,44 @@ class PrinterSettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _PrinterSettingsScreenState
-    extends ConsumerState<PrinterSettingsScreen> {
+    extends ConsumerState<PrinterSettingsScreen>
+    with WidgetsBindingObserver {
   List<DiscoveredPrinter> _discovered = const [];
   bool _scanning = false;
   bool _showAll = false;
+  bool _togglingBluetooth = false;
+
+  NativeBluetooth get _native => ref.read(nativeBluetoothProvider);
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(printerControllerProvider.notifier).refreshConnection();
     });
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    // Coming back from the system "turn on Bluetooth" dialog or the Bluetooth
+    // settings: re-read the adapter state and the connection.
+    ref.invalidate(bluetoothEnabledProvider);
+    ref.read(printerControllerProvider.notifier).refreshConnection();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final state = ref.watch(printerControllerProvider);
     final unsupportedReason = ref.watch(printingUnsupportedReasonProvider);
+    final bluetoothOn = ref.watch(bluetoothEnabledProvider).value ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -52,79 +75,148 @@ class _PrinterSettingsScreenState
               message: unsupportedReason,
             )
           else ...[
-            _ConnectedCard(state: state, onTestPrint: _testPrint),
+            // Bluetooth power sits at the very top: nothing else on this screen
+            // works until the adapter is on.
+            _BluetoothCard(
+              enabled: bluetoothOn,
+              busy: _togglingBluetooth,
+              onEnable: _enableBluetooth,
+              onDisable: _disableBluetooth,
+            ),
             const SizedBox(height: AppSpacing.lg),
 
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Paired devices',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: _scanning ? null : _scan,
-                  icon: _scanning
-                      ? const SizedBox(
-                          height: 14,
-                          width: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh, size: 18),
-                  label: Text(_scanning ? 'Scanning' : 'Refresh'),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            // SPP has no discovery step: the PM400 is paired once in the
-            // system Bluetooth settings and then appears here.
-            _Notice(
-              icon: Icons.lightbulb_outline,
-              color: AppColors.primary,
-              message:
-                  'Pair the PM400 in your phone\'s Bluetooth settings first, '
-                  'then refresh this list.',
-            ),
-
-            // Printers are shown by default; other paired devices (earbuds,
-            // phones) are hidden unless the user asks for them.
-            SwitchListTile(
-              value: _showAll,
-              contentPadding: EdgeInsets.zero,
-              secondary: const Icon(Icons.devices_other_outlined),
-              title: const Text('Show all paired devices'),
-              subtitle: const Text('Include non-printer Bluetooth devices'),
-              onChanged: (value) {
-                setState(() => _showAll = value);
-                _scan();
-              },
-            ),
-            const SizedBox(height: AppSpacing.sm),
-
-            if (_discovered.isEmpty && !_scanning)
+            if (!bluetoothOn)
               _Notice(
                 icon: Icons.bluetooth_disabled,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                message: _showAll
-                    ? 'No paired devices found.'
-                    : 'No paired printers found. Turn on "Show all paired '
-                          'devices" if your printer is missing.',
+                color: AppColors.warning,
+                message:
+                    'Turn on Bluetooth to connect and manage the receipt '
+                    'printer.',
               )
-            else
-              for (final printer in _discovered)
-                _PrinterTile(
-                  printer: printer,
-                  isSelected: state.saved?.address == printer.address,
-                  onTap: () => _select(printer),
-                ),
+            else ...[
+              _ConnectedCard(state: state, onTestPrint: _testPrint),
+              const SizedBox(height: AppSpacing.lg),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Paired devices',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _scanning ? null : _scan,
+                    icon: _scanning
+                        ? const SizedBox(
+                            height: 14,
+                            width: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh, size: 18),
+                    label: Text(_scanning ? 'Scanning' : 'Refresh'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // SPP has no discovery step: the PM400 is paired once in the
+              // system Bluetooth settings and then appears here.
+              _Notice(
+                icon: Icons.lightbulb_outline,
+                color: AppColors.primary,
+                message:
+                    'Pair the PM400 in your phone\'s Bluetooth settings first, '
+                    'then refresh this list.',
+              ),
+
+              // Printers are shown by default; other paired devices (earbuds,
+              // phones) are hidden unless the user asks for them.
+              SwitchListTile(
+                value: _showAll,
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.devices_other_outlined),
+                title: const Text('Show all paired devices'),
+                subtitle: const Text('Include non-printer Bluetooth devices'),
+                onChanged: (value) {
+                  setState(() => _showAll = value);
+                  _scan();
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              if (_discovered.isEmpty && !_scanning)
+                _Notice(
+                  icon: Icons.bluetooth_disabled,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  message: _showAll
+                      ? 'No paired devices found.'
+                      : 'No paired printers found. Turn on "Show all paired '
+                            'devices" if your printer is missing.',
+                )
+              else
+                for (final printer in _discovered)
+                  _PrinterTile(
+                    printer: printer,
+                    isSelected: state.saved?.address == printer.address,
+                    onTap: () => _select(printer),
+                  ),
+            ],
           ],
         ],
       ),
     );
+  }
+
+  Future<void> _enableBluetooth() async {
+    if (!await _ensurePermissions()) return;
+
+    setState(() => _togglingBluetooth = true);
+    try {
+      // Shows the system consent dialog. Its result comes back when the app
+      // resumes (didChangeAppLifecycleState), so also refresh here after a
+      // short beat and list devices if the adapter came on.
+      await _native.requestEnable();
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+    } finally {
+      if (mounted) setState(() => _togglingBluetooth = false);
+    }
+
+    if (!mounted) return;
+    ref.invalidate(bluetoothEnabledProvider);
+    if (await _native.isBluetoothOn()) {
+      await _scan();
+    }
+  }
+
+  Future<void> _disableBluetooth() async {
+    setState(() => _togglingBluetooth = true);
+    try {
+      // Drop the printer link first so it doesn't linger as "connected".
+      await ref.read(printerControllerProvider.notifier).disconnect();
+      final status = await _native.disable();
+      ref.invalidate(bluetoothEnabledProvider);
+      if (!mounted) return;
+
+      switch (status) {
+        case 'disabled':
+        case 'already_off':
+          setState(() => _discovered = const []);
+          _showMessage('Bluetooth turned off. Printer disconnected.');
+        default:
+          // Android 13+ blocks apps from turning Bluetooth off, so hand the
+          // user to the system settings to do it themselves.
+          _showMessage(
+            'Your Android version does not let apps turn Bluetooth off. '
+            'Opening Bluetooth settings…',
+          );
+          await _native.openSettings();
+      }
+    } finally {
+      if (mounted) setState(() => _togglingBluetooth = false);
+    }
   }
 
   Future<bool> _ensurePermissions() async {
@@ -226,16 +318,95 @@ class _PrinterSettingsScreenState
   }
 
   void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError
-              ? Theme.of(context).colorScheme.error
-              : null,
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.success,
+    );
+  }
+}
+
+/// Bluetooth power control — the first card on the screen. Shows the adapter
+/// state and an Enable/Disable action.
+class _BluetoothCard extends StatelessWidget {
+  const _BluetoothCard({
+    required this.enabled,
+    required this.busy,
+    required this.onEnable,
+    required this.onDisable,
+  });
+
+  final bool enabled;
+  final bool busy;
+  final VoidCallback onEnable;
+  final VoidCallback onDisable;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = enabled
+        ? AppColors.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          children: [
+            Container(
+              height: 44,
+              width: 44,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(AppRadius.md),
+              ),
+              child: Icon(
+                enabled ? Icons.bluetooth : Icons.bluetooth_disabled,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Bluetooth',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    enabled ? 'On' : 'Off',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (busy)
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else if (enabled)
+              OutlinedButton.icon(
+                onPressed: onDisable,
+                icon: const Icon(Icons.bluetooth_disabled, size: 18),
+                label: const Text('Disable'),
+              )
+            else
+              FilledButton.icon(
+                onPressed: onEnable,
+                icon: const Icon(Icons.bluetooth, size: 18),
+                label: const Text('Enable'),
+              ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }
 

@@ -6,6 +6,7 @@ import '../../../core/extensions/formatting.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../../data/models/sale_status.dart';
@@ -205,8 +206,10 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
       await ref.read(salesApiProvider).destroy(sale.id);
       _refreshEverything();
       if (!mounted) return;
-      context.pop();
+      // Toast before popping so it shows via the still-mounted context; the
+      // root-overlay message persists after this screen leaves.
       _toast('Sale ${sale.referenceNo} deleted.');
+      context.pop();
     } on ApiException catch (e) {
       if (mounted) _toast(e.message, isError: true);
     }
@@ -246,14 +249,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   }
 
   void _toast(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? AppColors.error : null,
-        ),
-      );
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.success,
+    );
   }
 
   Future<void> _print() async {
@@ -292,17 +292,11 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   static const _receiptCopies = 1;
 
   void _showMessage(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: Duration(seconds: isError ? 6 : 3),
-          backgroundColor: isError
-              ? Theme.of(context).colorScheme.error
-              : null,
-        ),
-      );
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.success,
+    );
   }
 }
 

@@ -13,8 +13,22 @@ import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../branding/providers/branding_providers.dart';
+import '../../printing/providers/printer_providers.dart';
 import '../../sales/presentation/widgets/sale_row_menu.dart';
 import '../providers/dashboard_providers.dart';
+
+/// Whether the "printer not connected" dashboard alert has been dismissed for
+/// this session. Resets on relaunch so a still-disconnected printer is flagged
+/// again next time the app opens.
+final printerAlertDismissedProvider =
+    NotifierProvider<PrinterAlertDismissed, bool>(PrinterAlertDismissed.new);
+
+class PrinterAlertDismissed extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void dismiss() => state = true;
+}
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -25,6 +39,14 @@ class DashboardScreen extends ConsumerWidget {
     final recent = ref.watch(dashboardRecentProvider);
     final brand = ref.watch(brandingProvider);
     final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
+
+    // Flag a missing printer: printing is supported on this platform but no
+    // printer is connected. The banner is dismissible for the session.
+    final printerConnected = ref.watch(printerControllerProvider).isConnected;
+    final printingSupported = ref.watch(printingSupportedProvider);
+    final showPrinterAlert = printingSupported &&
+        !printerConnected &&
+        !ref.watch(printerAlertDismissedProvider);
 
     return Scaffold(
       // Sticky top bar: the brand name and the shared overflow menu, matching
@@ -51,7 +73,15 @@ class DashboardScreen extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: AppSpacing.xl),
             children: [
               _Greeting(user: user),
-              _QuickMenu(canCreateSale: canCreateSale),
+              if (showPrinterAlert)
+                _PrinterAlert(
+                  onDismiss: () =>
+                      ref.read(printerAlertDismissedProvider.notifier).dismiss(),
+                ),
+              _QuickMenu(
+                canCreateSale: canCreateSale,
+                printerConnected: printerConnected || !printingSupported,
+              ),
               _RecentHeader(),
               ...switch (recent) {
                 AsyncData(:final value) => [
@@ -154,9 +184,13 @@ class _Greeting extends StatelessWidget {
 
 /// Vertical shortcut list — the salesman's primary actions, one tap each.
 class _QuickMenu extends StatelessWidget {
-  const _QuickMenu({required this.canCreateSale});
+  const _QuickMenu({
+    required this.canCreateSale,
+    required this.printerConnected,
+  });
 
   final bool canCreateSale;
+  final bool printerConnected;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +222,7 @@ class _QuickMenu extends StatelessWidget {
             title: 'Printer Setup',
             subtitle: 'Connect and test the receipt printer',
             onTap: () => context.go(Routes.printer),
+            badge: printerConnected ? null : const _NotConnectedBadge(),
           ),
           _QuickTile(
             icon: Icons.person,
@@ -202,6 +237,129 @@ class _QuickMenu extends StatelessWidget {
   }
 }
 
+/// Small red "Not connected" pill shown on the Printer Setup tile.
+class _NotConnectedBadge extends StatelessWidget {
+  const _NotConnectedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, size: 13, color: AppColors.error),
+          const SizedBox(width: 4),
+          Text(
+            'Not connected',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.error,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A professional, dismissible alert card shown on the dashboard when no
+/// receipt printer is connected.
+class _PrinterAlert extends StatelessWidget {
+  const _PrinterAlert({required this.onDismiss});
+
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 38,
+                  width: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  child: const Icon(
+                    Icons.print_disabled_outlined,
+                    color: AppColors.error,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Printer not connected',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.error,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Receipts cannot be printed on this device or account '
+                        'until a receipt printer is connected.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Dismiss',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: () => context.go(Routes.printer),
+                icon: const Icon(Icons.print_outlined, size: 18),
+                label: const Text('Set up printer'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _QuickTile extends StatelessWidget {
   const _QuickTile({
     required this.icon,
@@ -209,6 +367,7 @@ class _QuickTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.badge,
   });
 
   final IconData icon;
@@ -216,6 +375,9 @@ class _QuickTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
+  /// Optional status chip shown before the chevron (e.g. "Not connected").
+  final Widget? badge;
 
   @override
   Widget build(BuildContext context) {
@@ -259,6 +421,10 @@ class _QuickTile extends StatelessWidget {
                   ],
                 ),
               ),
+              if (badge != null) ...[
+                badge!,
+                const SizedBox(width: AppSpacing.xs),
+              ],
               Icon(
                 Icons.chevron_right,
                 color: theme.colorScheme.onSurfaceVariant,

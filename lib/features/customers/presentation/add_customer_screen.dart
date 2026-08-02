@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_form.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../data/models/catalogue.dart';
 import '../../../data/models/customer_form.dart';
 import '../providers/customer_providers.dart';
@@ -232,15 +233,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 5),
-        ),
-      );
+    showAppMessage(context, message, kind: AppMessageKind.error);
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../providers/branding_providers.dart';
 import 'company_details.dart';
+import 'developer_credit.dart';
 
 /// Company / contact details from `/v1/settings/general`.
 ///
@@ -16,7 +17,6 @@ class AboutScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final brand = ref.watch(brandingProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
@@ -30,14 +30,7 @@ class AboutScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Center(
-            child: Text(
-              'Developed by ${brand?.developedBy ?? 'KAF Sols.'}',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+          DeveloperCredit(name: brand?.developedBy ?? 'KAF Sols.'),
           const SizedBox(height: AppSpacing.md),
         ],
       ),

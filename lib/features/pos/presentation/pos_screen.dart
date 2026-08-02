@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/extensions/formatting.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_message.dart';
 import '../../../data/models/catalogue.dart';
 import '../../branding/providers/branding_providers.dart';
 import '../domain/cart.dart';
@@ -144,14 +145,11 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   void _toast(String message, {bool isError = false}) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? AppColors.error : null,
-        ),
-      );
+    showAppMessage(
+      context,
+      message,
+      kind: isError ? AppMessageKind.error : AppMessageKind.info,
+    );
   }
 }
 
@@ -352,7 +350,7 @@ class _CheckoutBar extends StatelessWidget {
             FilledButton.icon(
               onPressed: onCheckout,
               icon: const Icon(Icons.point_of_sale),
-              label: const Text('Charge'),
+              label: const Text('Continue'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(140, AppSpacing.minTouchTarget),
               ),

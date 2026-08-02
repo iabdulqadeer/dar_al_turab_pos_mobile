@@ -47,6 +47,8 @@ dependencies:
   print_bluetooth_thermal: ^1.2.1
   mobile_scanner: ^7.4.0
   permission_handler: ^12.0.3
+  # Opens the developer's website (kafsols.com) in the browser.
+  url_launcher: ^6.3.1
 
 # Removed as unused:
 #   riverpod_annotation / freezed_annotation / json_annotation and their
