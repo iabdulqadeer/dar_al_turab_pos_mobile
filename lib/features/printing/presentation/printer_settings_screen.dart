@@ -85,85 +85,87 @@ class _PrinterSettingsScreenState
             ),
             const SizedBox(height: AppSpacing.lg),
 
+            // Bluetooth-off is surfaced by the card above and by discovery (which
+            // reports "Bluetooth is turned off") — the rest of the screen stays
+            // visible either way so it never looks blank.
             if (!bluetoothOn)
               _Notice(
                 icon: Icons.bluetooth_disabled,
                 color: AppColors.warning,
                 message:
-                    'Turn on Bluetooth to connect and manage the receipt '
-                    'printer.',
-              )
-            else ...[
-              _ConnectedCard(state: state, onTestPrint: _testPrint),
-              const SizedBox(height: AppSpacing.lg),
+                    'Bluetooth is off. Turn it on above to connect the printer.',
+              ),
+            if (!bluetoothOn) const SizedBox(height: AppSpacing.sm),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Paired devices',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+            _ConnectedCard(state: state, onTestPrint: _testPrint),
+            const SizedBox(height: AppSpacing.lg),
+
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Paired devices',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: _scanning ? null : _scan,
-                    icon: _scanning
-                        ? const SizedBox(
-                            height: 14,
-                            width: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.refresh, size: 18),
-                    label: Text(_scanning ? 'Scanning' : 'Refresh'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
+                ),
+                TextButton.icon(
+                  onPressed: _scanning ? null : _scan,
+                  icon: _scanning
+                      ? const SizedBox(
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh, size: 18),
+                  label: Text(_scanning ? 'Scanning' : 'Refresh'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
 
-              // SPP has no discovery step: the PM400 is paired once in the
-              // system Bluetooth settings and then appears here.
+            // SPP has no discovery step: the PM400 is paired once in the
+            // system Bluetooth settings and then appears here.
+            _Notice(
+              icon: Icons.lightbulb_outline,
+              color: AppColors.primary,
+              message:
+                  'Pair the PM400 in your phone\'s Bluetooth settings first, '
+                  'then refresh this list.',
+            ),
+
+            // Printers are shown by default; other paired devices (earbuds,
+            // phones) are hidden unless the user asks for them.
+            SwitchListTile(
+              value: _showAll,
+              contentPadding: EdgeInsets.zero,
+              secondary: const Icon(Icons.devices_other_outlined),
+              title: const Text('Show all paired devices'),
+              subtitle: const Text('Include non-printer Bluetooth devices'),
+              onChanged: (value) {
+                setState(() => _showAll = value);
+                _scan();
+              },
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            if (_discovered.isEmpty && !_scanning)
               _Notice(
-                icon: Icons.lightbulb_outline,
-                color: AppColors.primary,
-                message:
-                    'Pair the PM400 in your phone\'s Bluetooth settings first, '
-                    'then refresh this list.',
-              ),
-
-              // Printers are shown by default; other paired devices (earbuds,
-              // phones) are hidden unless the user asks for them.
-              SwitchListTile(
-                value: _showAll,
-                contentPadding: EdgeInsets.zero,
-                secondary: const Icon(Icons.devices_other_outlined),
-                title: const Text('Show all paired devices'),
-                subtitle: const Text('Include non-printer Bluetooth devices'),
-                onChanged: (value) {
-                  setState(() => _showAll = value);
-                  _scan();
-                },
-              ),
-              const SizedBox(height: AppSpacing.sm),
-
-              if (_discovered.isEmpty && !_scanning)
-                _Notice(
-                  icon: Icons.bluetooth_disabled,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  message: _showAll
-                      ? 'No paired devices found.'
-                      : 'No paired printers found. Turn on "Show all paired '
-                            'devices" if your printer is missing.',
-                )
-              else
-                for (final printer in _discovered)
-                  _PrinterTile(
-                    printer: printer,
-                    isSelected: state.saved?.address == printer.address,
-                    onTap: () => _select(printer),
-                  ),
-            ],
+                icon: Icons.bluetooth_disabled,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                message: _showAll
+                    ? 'No paired devices found.'
+                    : 'No paired printers found. Turn on "Show all paired '
+                          'devices" if your printer is missing.',
+              )
+            else
+              for (final printer in _discovered)
+                _PrinterTile(
+                  printer: printer,
+                  isSelected: state.saved?.address == printer.address,
+                  onTap: () => _select(printer),
+                ),
           ],
         ],
       ),

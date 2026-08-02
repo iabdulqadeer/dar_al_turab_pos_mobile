@@ -59,7 +59,6 @@ class DeveloperCredit extends StatelessWidget {
             style: base?.copyWith(
               color: AppColors.primary,
               fontWeight: FontWeight.w700,
-              decoration: TextDecoration.underline,
             ),
           ),
         ),

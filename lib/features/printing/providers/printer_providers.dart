@@ -29,8 +29,13 @@ final nativeBluetoothProvider = Provider<NativeBluetooth>((ref) {
 
 /// Whether the Bluetooth adapter is currently on. Refreshable — invalidate it
 /// after toggling Bluetooth or when the app resumes from the system dialog.
+///
+/// Uses the transport's proven `PrintBluetoothThermal.bluetoothEnabled` path
+/// (the same one discovery relies on) rather than the native channel, so the
+/// value is reliable and never leaves the screen stuck thinking Bluetooth is
+/// off.
 final bluetoothEnabledProvider = FutureProvider.autoDispose<bool>((ref) {
-  return ref.watch(nativeBluetoothProvider).isBluetoothOn();
+  return ref.watch(printerTransportProvider).isBluetoothOn;
 });
 
 /// The printer the user selected, persisted between launches.

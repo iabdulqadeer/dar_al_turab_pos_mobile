@@ -93,7 +93,6 @@ class _Row extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
-                decoration: TextDecoration.underline,
               ),
             ),
           )
