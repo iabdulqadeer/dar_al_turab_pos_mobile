@@ -80,7 +80,9 @@ class ProfileScreen extends ConsumerWidget {
                           color: AppColors.success,
                         )
                       : null,
-                  onTap: () => context.push(Routes.printer),
+                  // Switch to the Printer tab rather than pushing a branch route
+                  // across branches (which rebuilds the shell and crashes).
+                  onTap: () => context.go(Routes.printer),
                 ),
               ],
             ),

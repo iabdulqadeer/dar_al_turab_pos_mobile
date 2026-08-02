@@ -463,8 +463,13 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
             ? AppMessageKind.warning
             : AppMessageKind.success,
       );
+      // Capture the router before popping the sheet, then replace the POS
+      // screen with the sale detail so "back" returns to the shell rather than
+      // the now-empty cart. The detail is a root-navigator route, so this does
+      // not rebuild the shell.
+      final router = GoRouter.of(context);
       Navigator.pop(context);
-      context.push('${Routes.sales}/${sale.id}');
+      router.pushReplacement('${Routes.sales}/${sale.id}');
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);

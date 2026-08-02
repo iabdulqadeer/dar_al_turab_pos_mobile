@@ -125,6 +125,13 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':id',
+                    // Pushed over the shell on the root navigator so it can be
+                    // opened from any tab (or the POS screen) without go_router
+                    // rebuilding the shell — pushing a branch route from another
+                    // branch re-reserves the branch navigator's GlobalKey and
+                    // throws `!keyReservation.contains(key)`. The edit child does
+                    // the same for the same reason.
+                    parentNavigatorKey: _rootNavigatorKey,
                     builder: (context, state) {
                       // A non-numeric id cannot match a sale; the server would
                       // answer 404 anyway, so fail fast with a clear message.
