@@ -150,6 +150,7 @@ void main() {
       lines: lines,
       customer: const CatalogueCustomer(id: 1, name: 'Walk in'),
       biller: const NamedRef(id: 1, name: 'Biller'),
+      warehouse: const NamedRef(id: 1, name: 'Warehouse'),
       removeDecimalAmount: false,
     );
 
@@ -207,16 +208,25 @@ void main() {
       expect(Cart(lines: []).validationError, isNotNull);
     });
 
-    test('requires a customer and a biller', () {
+    test('requires a customer, warehouse and biller', () {
       final noCustomer = Cart(
         lines: [CartLine.fromProduct(product())],
         biller: const NamedRef(id: 1, name: 'B'),
+        warehouse: const NamedRef(id: 1, name: 'W'),
       );
       expect(noCustomer.validationError, contains('customer'));
+
+      final noWarehouse = Cart(
+        lines: [CartLine.fromProduct(product())],
+        customer: const CatalogueCustomer(id: 1, name: 'C'),
+        biller: const NamedRef(id: 1, name: 'B'),
+      );
+      expect(noWarehouse.validationError, contains('warehouse'));
 
       final noBiller = Cart(
         lines: [CartLine.fromProduct(product())],
         customer: const CatalogueCustomer(id: 1, name: 'C'),
+        warehouse: const NamedRef(id: 1, name: 'W'),
       );
       expect(noBiller.validationError, contains('biller'));
     });
@@ -226,6 +236,7 @@ void main() {
         lines: [CartLine.fromProduct(product())],
         customer: const CatalogueCustomer(id: 1, name: 'C'),
         biller: const NamedRef(id: 1, name: 'B'),
+        warehouse: const NamedRef(id: 1, name: 'W'),
       );
 
       expect(cart.validationError, isNull);
@@ -237,6 +248,7 @@ void main() {
       lines: [CartLine.fromProduct(product())..qty = 10],
       customer: const CatalogueCustomer(id: 3, name: 'C'),
       biller: const NamedRef(id: 4, name: 'B'),
+      warehouse: const NamedRef(id: 5, name: 'W'),
       removeDecimalAmount: false,
     );
 
@@ -291,6 +303,7 @@ void main() {
         ],
         customer: const CatalogueCustomer(id: 3, name: 'C'),
         biller: const NamedRef(id: 4, name: 'B'),
+        warehouse: const NamedRef(id: 5, name: 'W'),
       );
 
       final json = cart.toUpdateJson(
@@ -304,12 +317,14 @@ void main() {
     });
 
     test('omits fields the update endpoint does not accept', () {
-      // PUT /sales/{id} takes no warehouse_id, is_pos, reference_no or
-      // payment block — sending them would be rejected or silently ignored.
+      // PUT /sales/{id} takes no is_pos, reference_no or payment block, but
+      // warehouse_id/biller_id ARE sent (the server honours a biller change and,
+      // for an admin, a warehouse change).
       final cart = Cart(
         lines: [CartLine.fromProduct(product())],
         customer: const CatalogueCustomer(id: 3, name: 'C'),
         biller: const NamedRef(id: 4, name: 'B'),
+        warehouse: const NamedRef(id: 5, name: 'W'),
       );
 
       final json = cart.toUpdateJson(
@@ -319,7 +334,7 @@ void main() {
       );
 
       expect(json.containsKey('payment'), isFalse);
-      expect(json.containsKey('warehouse_id'), isFalse);
+      expect(json['warehouse_id'], 5);
       expect(json.containsKey('is_pos'), isFalse);
       expect(json.containsKey('reference_no'), isFalse);
       expect(json['paid_amount'], 50);

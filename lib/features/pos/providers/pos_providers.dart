@@ -136,6 +136,16 @@ class CartController extends Notifier<Cart> {
         cart.biller = meta.defaultBiller;
         changed = true;
       }
+      // Default to the account's own warehouse (or the first offered, which is
+      // what an admin with no warehouse of their own falls back to).
+      if (cart.warehouse == null && meta.warehouses.isNotEmpty) {
+        final id = meta.effectiveWarehouseId;
+        cart.warehouse = meta.warehouses.firstWhere(
+          (w) => w.id == id,
+          orElse: () => meta.warehouses.first,
+        );
+        changed = true;
+      }
 
       if (changed) _touch();
     });
@@ -159,6 +169,7 @@ class CartController extends Notifier<Cart> {
       lines: List.of(state.lines),
       customer: state.customer,
       biller: state.biller,
+      warehouse: state.warehouse,
       orderDiscount: state.orderDiscount,
       shippingCost: state.shippingCost,
       removeDecimalAmount: state.removeDecimalAmount,
@@ -206,6 +217,11 @@ class CartController extends Notifier<Cart> {
     _touch();
   }
 
+  void setWarehouse(NamedRef? warehouse) {
+    state.warehouse = warehouse;
+    _touch();
+  }
+
   void setOrderDiscount(double value) {
     state.orderDiscount = value < 0 ? 0 : value;
     _touch();
@@ -231,7 +247,7 @@ class CartController extends Notifier<Cart> {
   }
 
   void reset() {
-    state = Cart(lines: [], biller: state.biller);
+    state = Cart(lines: [], biller: state.biller, warehouse: state.warehouse);
   }
 }
 

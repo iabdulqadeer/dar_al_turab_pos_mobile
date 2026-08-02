@@ -11,11 +11,14 @@ class CustomerApi {
 
   final ApiClient _client;
 
-  /// `GET /v1/customers/create-form` — customer groups + areas for the two
-  /// dropdowns. `warehouse_id` in the response is informational only.
-  Future<CustomerCreateForm> createForm() {
+  /// `GET /v1/customers/create-form` — the full warehouse list plus the customer
+  /// groups + areas for the two dropdowns. [warehouseId] re-scopes the
+  /// groups/areas to a specific warehouse (the warehouse list itself is always
+  /// the full active set).
+  Future<CustomerCreateForm> createForm({int? warehouseId}) {
     return _client.get(
       'v1/customers/create-form',
+      query: {'warehouse_id': ?warehouseId},
       parse: (data) =>
           CustomerCreateForm.fromJson(Map<String, dynamic>.from(data as Map)),
     );
@@ -26,9 +29,11 @@ class CustomerApi {
   /// [CatalogueCustomer] only needs the flat fields, so it slots straight into
   /// the sale cart.
   ///
-  /// warehouse_id, opening_balance, balance_limit and is_active are resolved or
-  /// hardcoded server-side, so they are deliberately never sent.
+  /// `warehouse_id` is required and persisted exactly as sent (for admin and
+  /// staff alike). opening_balance, balance_limit and is_active are hardcoded
+  /// server-side, so they are deliberately never sent.
   Future<CatalogueCustomer> create({
+    required int warehouseId,
     required int customerGroupId,
     required int areaId,
     required String name,
@@ -42,6 +47,7 @@ class CustomerApi {
     return _client.post(
       'v1/customers',
       body: {
+        'warehouse_id': warehouseId,
         'customer_group_id': customerGroupId,
         'area_id': areaId,
         'name': name,

@@ -202,6 +202,7 @@ class Cart {
     this.lines = const [],
     this.customer,
     this.biller,
+    this.warehouse,
     this.orderDiscount = 0,
     this.shippingCost = 0,
     this.removeDecimalAmount = false,
@@ -210,6 +211,11 @@ class Cart {
   final List<CartLine> lines;
   CatalogueCustomer? customer;
   NamedRef? biller;
+
+  /// The warehouse the sale is booked against. Sent as `warehouse_id`. For a
+  /// non-admin the server forces its own account warehouse regardless of what
+  /// is sent; for an admin the selected value is honoured.
+  NamedRef? warehouse;
   double orderDiscount;
   double shippingCost;
 
@@ -249,6 +255,7 @@ class Cart {
   String? get validationError {
     if (isEmpty) return 'Add at least one item.';
     if (customer == null) return 'Choose a customer.';
+    if (warehouse == null) return 'Choose a warehouse.';
     if (biller == null) return 'Choose a biller.';
     if (lines.any((l) => l.qty <= 0)) {
       return 'Every line needs a quantity greater than zero.';
@@ -278,6 +285,7 @@ class Cart {
     return {
       'customer_id': customer!.id,
       'biller_id': biller!.id,
+      'warehouse_id': warehouse!.id,
       'sale_status': saleStatus,
       'payment_status': paymentStatus,
       'is_pos': isPos,
@@ -312,11 +320,14 @@ class Cart {
   /// The PUT /sales/{id} body.
   ///
   /// Differs from create in three ways the API documents:
-  ///   - no `warehouse_id`, `is_pos`, `reference_no` or `serial_no`; those are
-  ///     fixed once a sale exists,
+  ///   - no `is_pos`, `reference_no` or `serial_no`; those are fixed once a sale
+  ///     exists,
   ///   - no `payment` block — money on an existing sale goes through the
   ///     payments sub-resource so the ledger stays authoritative,
   ///   - `items[].id` is carried so lines are updated rather than replaced.
+  ///
+  /// `warehouse_id`/`biller_id` are sent (the server honours a biller change and,
+  /// for an admin, a warehouse change; a non-admin's warehouse stays forced).
   ///
   /// [paidAmount] is the sale's existing paid total, passed straight back
   /// because the endpoint recomputes payment status from it.
@@ -329,6 +340,7 @@ class Cart {
     return {
       'customer_id': customer!.id,
       'biller_id': biller!.id,
+      'warehouse_id': warehouse!.id,
       'sale_status': saleStatus,
       'payment_status': paymentStatus,
       'remove_decimal_amount': removeDecimalAmount,

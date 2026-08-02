@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_message.dart';
 import '../../../data/models/catalogue.dart';
 import '../../../data/models/sale.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../branding/providers/branding_providers.dart';
 import '../../dashboard/providers/dashboard_providers.dart';
 import '../../sales/providers/sales_providers.dart';
@@ -15,6 +16,7 @@ import '../providers/pos_providers.dart';
 import 'widgets/cart_line_editor.dart';
 import 'widgets/customer_picker.dart';
 import 'widgets/product_search_sheet.dart';
+import 'widgets/sale_context_bar.dart';
 
 /// Loads a sale's edit form and lets its lines be corrected.
 ///
@@ -34,10 +36,19 @@ class EditSaleScreen extends ConsumerStatefulWidget {
 class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
   Cart? _cart;
   SaleDetail? _sale;
+  SaleFormMetadata? _meta;
 
   Object? _loadError;
   bool _loading = true;
   bool _saving = false;
+
+  /// Warehouse/biller editable for an admin or a non-admin with no fixed
+  /// biller; otherwise locked to the account's values.
+  bool get _contextEditable {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return false;
+    return user.isAdmin || user.billerId == null;
+  }
 
   @override
   void initState() {
@@ -69,16 +80,16 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
       final taxRate = ref.read(saleTaxRateProvider);
 
       setState(() {
-        // form.metadata carries billers, banks and payment methods. The sale's
-        // own customer and biller come from the sale itself, so that part of
-        // the bundle is unused; products are searched live when adding a line.
+        // form.metadata carries the warehouse + biller options for the
+        // context bar; banks/payment methods in it are unused here.
+        _meta = form.metadata;
         _sale = sale;
         _cart = Cart(
           lines: sale.items
               .map((i) => CartLine.fromSaleItem(i)..taxRate = taxRate)
               .toList(),
-          // The sale's own customer and biller, rebuilt from the detail so
-          // the header reads correctly without a second lookup.
+          // The sale's own customer, biller and warehouse, rebuilt from the
+          // detail so the header reads correctly without a second lookup.
           customer: sale.customer == null
               ? null
               : CatalogueCustomer(
@@ -93,6 +104,12 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
               : NamedRef(
                   id: sale.biller!.id ?? 0,
                   name: sale.biller!.name,
+                ),
+          warehouse: sale.warehouse == null
+              ? null
+              : NamedRef(
+                  id: sale.warehouse!.id ?? 0,
+                  name: sale.warehouse!.name,
                 ),
           orderDiscount: sale.totals.orderDiscount,
           shippingCost: sale.totals.shippingCost,
@@ -199,6 +216,16 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
             ),
           ),
         ),
+        if (_meta != null)
+          SaleContextBar(
+            warehouses: _meta!.warehouses,
+            billers: _meta!.billers,
+            warehouse: cart.warehouse,
+            biller: cart.biller,
+            editable: _contextEditable,
+            onWarehouseChanged: (w) => setState(() => cart.warehouse = w),
+            onBillerChanged: (b) => setState(() => cart.biller = b),
+          ),
         if (cart.isEmpty)
           Expanded(
             child: Center(

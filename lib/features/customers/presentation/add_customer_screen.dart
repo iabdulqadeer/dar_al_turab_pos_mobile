@@ -31,12 +31,27 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
   final _trn = TextEditingController();
   final _manager = TextEditingController();
 
+  int? _warehouseId;
   int? _groupId;
   int? _areaId;
   bool _saving = false;
 
+  /// Reference data (warehouses + the areas/groups for the picked warehouse).
+  CustomerCreateForm? _data;
+  bool _loading = true;
+  Object? _loadError;
+
+  /// True while re-fetching areas/groups after a warehouse change.
+  bool _scopeLoading = false;
+
   /// Field errors from a 422, shown inline beneath the matching input.
   Map<String, List<String>>? _serverErrors;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
@@ -46,20 +61,68 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     super.dispose();
   }
 
+  /// Initial load: the full warehouse list plus the areas/groups for the
+  /// server's default warehouse, which we adopt as the initial selection.
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
+    try {
+      final data = await ref.read(customerApiProvider).createForm();
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        // Adopt the server's preview warehouse, or the first one, so the
+        // areas/groups already shown match the selected warehouse.
+        _warehouseId = data.warehouseId ??
+            (data.warehouses.isEmpty ? null : data.warehouses.first.id);
+        _loading = false;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e;
+        _loading = false;
+      });
+    }
+  }
+
+  /// Warehouse changed: the areas and customer groups are warehouse-scoped, so
+  /// re-fetch them and clear the now-stale area/group selection.
+  Future<void> _onWarehouseChanged(int? warehouseId) async {
+    if (warehouseId == null || warehouseId == _warehouseId) return;
+    setState(() {
+      _warehouseId = warehouseId;
+      _groupId = null;
+      _areaId = null;
+      _scopeLoading = true;
+    });
+    try {
+      final data = await ref
+          .read(customerApiProvider)
+          .createForm(warehouseId: warehouseId);
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _scopeLoading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _scopeLoading = false);
+      _showError(e.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final form = ref.watch(customerCreateFormProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Add customer')),
-      body: form.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _LoadError(
-          error: error,
-          onRetry: () => ref.invalidate(customerCreateFormProvider),
-        ),
-        data: (data) => _form(data),
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? _LoadError(error: _loadError!, onRetry: _load)
+          : _form(_data!),
     );
   }
 
@@ -72,19 +135,34 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
           FormSection(
             title: 'Customer',
             subtitle:
-                'Group and area come from the back office. Warehouse is set '
-                'automatically from your account.',
+                'Pick a warehouse first — its areas and customer groups load '
+                'below. Group and area come from the back office.',
             children: [
+              _Dropdown<int>(
+                label: 'Warehouse',
+                required: true,
+                value: _warehouseId,
+                hint: 'Select a warehouse',
+                items: [
+                  for (final w in data.warehouses)
+                    DropdownMenuItem(value: w.id, child: Text(w.name)),
+                ],
+                onChanged: _scopeLoading ? null : _onWarehouseChanged,
+                errorText: _serverError('warehouse_id'),
+                validator: (v) => v == null ? 'Choose a warehouse.' : null,
+              ),
               _Dropdown<int>(
                 label: 'Customer group',
                 required: true,
                 value: _groupId,
-                hint: 'Select a group',
+                hint: _scopeLoading ? 'Loading…' : 'Select a group',
                 items: [
                   for (final g in data.customerGroups)
                     DropdownMenuItem(value: g.id, child: Text(g.name)),
                 ],
-                onChanged: (v) => setState(() => _groupId = v),
+                onChanged: _scopeLoading
+                    ? null
+                    : (v) => setState(() => _groupId = v),
                 errorText: _serverError('customer_group_id'),
                 validator: (v) => v == null ? 'Choose a customer group.' : null,
               ),
@@ -92,12 +170,14 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
                 label: 'Area',
                 required: true,
                 value: _areaId,
-                hint: 'Select an area',
+                hint: _scopeLoading ? 'Loading…' : 'Select an area',
                 items: [
                   for (final a in data.areas)
                     DropdownMenuItem(value: a.id, child: Text(a.name)),
                 ],
-                onChanged: (v) => setState(() => _areaId = v),
+                onChanged: _scopeLoading
+                    ? null
+                    : (v) => setState(() => _areaId = v),
                 errorText: _serverError('area_id'),
                 validator: (v) => v == null ? 'Choose an area.' : null,
               ),
@@ -199,6 +279,7 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
 
     try {
       final created = await ref.read(customerApiProvider).create(
+            warehouseId: _warehouseId!,
             customerGroupId: _groupId!,
             areaId: _areaId!,
             name: _name.text.trim(),
@@ -254,7 +335,9 @@ class _Dropdown<T> extends StatelessWidget {
   final String label;
   final T? value;
   final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
+
+  /// Null disables the dropdown (e.g. while its options are reloading).
+  final ValueChanged<T?>? onChanged;
   final String? hint;
   final bool required;
   final String? errorText;

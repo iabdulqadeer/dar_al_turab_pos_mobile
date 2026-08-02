@@ -5,6 +5,7 @@ import '../../../core/extensions/formatting.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_message.dart';
 import '../../../data/models/catalogue.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../branding/providers/branding_providers.dart';
 import '../domain/cart.dart';
 import '../providers/pos_providers.dart';
@@ -12,6 +13,7 @@ import 'widgets/cart_line_editor.dart';
 import 'widgets/customer_picker.dart';
 import 'widgets/payment_sheet.dart';
 import 'widgets/product_search_sheet.dart';
+import 'widgets/sale_context_bar.dart';
 
 class PosScreen extends ConsumerStatefulWidget {
   const PosScreen({super.key});
@@ -42,6 +44,14 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     super.dispose();
   }
 
+  /// Warehouse/biller are editable for an admin, or a non-admin whose account
+  /// has no fixed biller; otherwise they are locked to the account's values.
+  bool get _contextEditable {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return false;
+    return user.isAdmin || user.billerId == null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
@@ -68,6 +78,17 @@ class _PosScreenState extends ConsumerState<PosScreen> {
         data: (meta) => Column(
           children: [
             _CustomerBar(cart: cart, meta: meta),
+            SaleContextBar(
+              warehouses: meta.warehouses,
+              billers: meta.billers,
+              warehouse: cart.warehouse,
+              biller: cart.biller,
+              editable: _contextEditable,
+              onWarehouseChanged: (w) =>
+                  ref.read(cartProvider.notifier).setWarehouse(w),
+              onBillerChanged: (b) =>
+                  ref.read(cartProvider.notifier).setBiller(b),
+            ),
             ProductSearchField(
               controller: _searchController,
               onChanged: (value) =>
@@ -192,15 +213,6 @@ class _CustomerBar extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (cart.biller != null)
-                      Text(
-                        'Biller: ${cart.biller!.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                   ],
                 ),
               ),
