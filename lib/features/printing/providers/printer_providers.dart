@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bluetooth_classic_transport.dart';
-import '../native_bluetooth.dart';
 import '../printer_transport.dart';
 import '../receipt_printer.dart';
 
@@ -20,22 +19,6 @@ final printerTransportProvider = Provider<PrinterTransport>((ref) {
 
 final receiptPrinterProvider = Provider<ReceiptPrinter>((ref) {
   return ReceiptPrinter(transport: ref.watch(printerTransportProvider));
-});
-
-/// The native Bluetooth bridge (adapter control + bonded-device listing).
-final nativeBluetoothProvider = Provider<NativeBluetooth>((ref) {
-  return const NativeBluetooth();
-});
-
-/// Whether the Bluetooth adapter is currently on. Refreshable — invalidate it
-/// after toggling Bluetooth or when the app resumes from the system dialog.
-///
-/// Uses the transport's proven `PrintBluetoothThermal.bluetoothEnabled` path
-/// (the same one discovery relies on) rather than the native channel, so the
-/// value is reliable and never leaves the screen stuck thinking Bluetooth is
-/// off.
-final bluetoothEnabledProvider = FutureProvider.autoDispose<bool>((ref) {
-  return ref.watch(printerTransportProvider).isBluetoothOn;
 });
 
 /// The printer the user selected, persisted between launches.
