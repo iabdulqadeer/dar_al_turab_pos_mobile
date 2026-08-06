@@ -102,13 +102,13 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     // permission-only gate.
     final canEditLines = canEdit && sale.paymentStatus == PaymentStatus.due;
 
-    // Never render a menu whose every entry would 403.
-    if (!canEdit && !canDelete) return const SizedBox.shrink();
+    // Never render a menu with no entries. (Adding a payment now lives on the
+    // "Settle" FAB only, not this menu.)
+    if (!canEditLines && !canDelete) return const SizedBox.shrink();
 
     return PopupMenuButton<String>(
       onSelected: (value) => switch (value) {
         'edit' => _editSale(sale),
-        'payment' => _addOrEditPayment(sale),
         'delete' => _deleteSale(sale),
         _ => null,
       },
@@ -119,15 +119,6 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
             child: ListTile(
               leading: Icon(Icons.edit_outlined),
               title: Text('Edit sale'),
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        if (canEdit)
-          const PopupMenuItem(
-            value: 'payment',
-            child: ListTile(
-              leading: Icon(Icons.payments_outlined),
-              title: Text('Add payment'),
               contentPadding: EdgeInsets.zero,
             ),
           ),
@@ -484,7 +475,8 @@ class _HeaderCard extends StatelessWidget {
             if (sale.customer?.trnNumber != null)
               _MetaRow('TRN', sale.customer!.trnNumber),
             _MetaRow('Warehouse', sale.warehouse?.name),
-            _MetaRow('Sales Person', sale.createdBy?.name),
+            _MetaRow('Sales Person', sale.biller?.name),
+            _MetaRow('Created By', sale.createdBy?.name),
           ],
         ),
       ),
