@@ -256,12 +256,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
 
+    // Read the field before disposing the controller — using it afterwards
+    // throws "A TextEditingController was used after being disposed".
+    final entered = controller.text.trim();
     controller.dispose();
 
     if (saved ?? false) {
       await ref
           .read(authControllerProvider.notifier)
-          .setBaseUrl(controller.text);
+          .setBaseUrl(entered);
       if (mounted) {
         showAppMessage(
           context,

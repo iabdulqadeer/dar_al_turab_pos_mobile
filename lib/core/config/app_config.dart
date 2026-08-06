@@ -1,31 +1,26 @@
 /// Build-time configuration.
 ///
-/// Override at build time, e.g.
-/// `flutter run --dart-define=API_BASE_URL=http://192.168.1.20/dar_al_turab_pos_1/public/api/`
-///
-/// The default targets a WAMP instance on the host machine as seen from an
-/// Android emulator (10.0.2.2 maps to the host's localhost). A physical
-/// device on the same LAN needs the machine's real IP instead, which the
-/// settings screen lets the user set at runtime.
+/// The default now targets the **live production** API. For local development
+/// against a dev backend, override the base URL at build time — the value is a
+/// single config point, never scattered across screens.
 abstract final class AppConfig {
   /// Where the API lives.
   ///
-  /// The default assumes an `adb reverse tcp:8080 tcp:80` tunnel, which
-  /// forwards the phone's localhost:8080 to the development machine's port 80
-  /// over USB. That path avoids Wi-Fi and Windows Firewall entirely — without
-  /// an inbound rule for port 80, a direct LAN request is silently dropped
-  /// and surfaces in the app as a connection timeout.
+  /// Defaults to production. The endpoint paths the app sends already start with
+  /// `v1/` (e.g. `v1/auth/login`), so the base URL ends at `/api/` — **without**
+  /// a `v1` segment — otherwise requests would double up as `.../api/v1/v1/...`.
+  /// The trailing slash matters: Dio joins the relative paths against it.
   ///
-  /// Override per target:
-  ///   emulator  --dart-define=API_BASE_URL=http://10.0.2.2/dar_al_turab_pos_1/public/api/
-  ///   real LAN  --dart-define=API_BASE_URL=http://10.66.96.244/dar_al_turab_pos_1/public/api/
-  ///   web/desktop --dart-define=API_BASE_URL=http://localhost/dar_al_turab_pos_1/public/api/
+  /// Override for local dev, e.g.:
+  ///   real LAN   --dart-define=API_BASE_URL=http://192.168.1.3/dar_al_turab_pos_1/public/api/
+  ///   emulator   --dart-define=API_BASE_URL=http://10.0.2.2/dar_al_turab_pos_1/public/api/
+  ///   adb tunnel --dart-define=API_BASE_URL=http://localhost:8080/dar_al_turab_pos_1/public/api/
   ///
-  /// The login screen also lets the user set this at runtime, which is what
-  /// production devices will use.
+  /// The login screen's "Server address" setting also lets a device point at a
+  /// different host at runtime without rebuilding.
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080/dar_al_turab_pos_1/public/api/',
+    defaultValue: 'https://app.daralturabfoodstuff.com/api/',
   );
 
   static const appName = 'Dar Al Turab POS';
