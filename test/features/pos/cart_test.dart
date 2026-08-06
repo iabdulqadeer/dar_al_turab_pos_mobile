@@ -10,12 +10,13 @@ CatalogueProduct product({
   double stock = 100,
   double perPieceGross = 0,
   double perPieceWaste = 0,
+  String unitName = 'KG',
 }) {
   return CatalogueProduct(
     id: 1,
     name: 'Test Product',
     code: 'TP1',
-    unit: const SaleUnit(id: 4, name: 'KG'),
+    unit: SaleUnit(id: 4, name: unitName),
     pricing: ProductPricing(
       basePrice: price,
       resolvedPrice: price,
@@ -203,7 +204,50 @@ void main() {
     });
   });
 
+  group('CartLine.isWeightBased / isComplete', () {
+    // A KG line uses the weight form and needs pieces + gross + net.
+    CartLine weightLine() => CartLine.fromProduct(product())
+      ..noOfPcs = 2
+      ..grossWeight = 10
+      ..wasteQty = 1
+      ..qty = 9; // net = gross - waste
+
+    // A PC line uses the simple form and needs only quantity.
+    CartLine simpleLine() =>
+        CartLine.fromProduct(product(unitName: 'PC'))..qty = 3;
+
+    test('a KG unit is weight-based; a PC unit is not', () {
+      expect(CartLine.fromProduct(product()).isWeightBased, isTrue);
+      expect(CartLine.fromProduct(product(unitName: 'PC')).isWeightBased, isFalse);
+    });
+
+    test('a fully-filled weight line is complete', () {
+      expect(weightLine().isComplete, isTrue);
+    });
+
+    test('a weight line missing pieces or gross is incomplete', () {
+      expect((weightLine()..noOfPcs = 0).isComplete, isFalse);
+      expect((weightLine()..grossWeight = 0).isComplete, isFalse);
+    });
+
+    test('any line with a zero unit price is incomplete', () {
+      expect((weightLine()..unitPrice = 0).isComplete, isFalse);
+      expect((simpleLine()..unitPrice = 0).isComplete, isFalse);
+    });
+
+    test('a simple line only needs a positive quantity + price', () {
+      expect(simpleLine().isComplete, isTrue);
+      expect((simpleLine()..qty = 0).isComplete, isFalse);
+    });
+  });
+
   group('Cart validation', () {
+    CartLine completeLine() => CartLine.fromProduct(product())
+      ..noOfPcs = 2
+      ..grossWeight = 10
+      ..wasteQty = 0
+      ..qty = 10;
+
     test('rejects an empty basket', () {
       expect(Cart(lines: []).validationError, isNotNull);
     });
@@ -231,15 +275,30 @@ void main() {
       expect(noBiller.validationError, contains('biller'));
     });
 
-    test('accepts a complete basket', () {
-      final cart = Cart(
-        lines: [CartLine.fromProduct(product())],
-        customer: const CatalogueCustomer(id: 1, name: 'C'),
-        biller: const NamedRef(id: 1, name: 'B'),
-        warehouse: const NamedRef(id: 1, name: 'W'),
-      );
+    Cart cartOf(List<CartLine> lines) => Cart(
+      lines: lines,
+      customer: const CatalogueCustomer(id: 1, name: 'C'),
+      biller: const NamedRef(id: 1, name: 'B'),
+      warehouse: const NamedRef(id: 1, name: 'W'),
+    );
 
-      expect(cart.validationError, isNull);
+    test('accepts a complete basket', () {
+      expect(cartOf([completeLine()]).validationError, isNull);
+    });
+
+    test('rejects a line with incomplete details (issue #4)', () {
+      // Product added but its details never filled in.
+      final error = cartOf([CartLine.fromProduct(product())]).validationError;
+      expect(error, contains('Product details'));
+    });
+
+    test('rejects a zero grand total (issue #2)', () {
+      // A "complete" line whose price is 0 → total 0. Give it a price so the
+      // per-line check passes, then force the total to 0 via a matching
+      // order discount so only the total rule can fire.
+      final cart = cartOf([completeLine()])..orderDiscount = 100; // 10*10 = 100
+      expect(cart.grandTotal, 0);
+      expect(cart.validationError, contains('greater than zero'));
     });
   });
 

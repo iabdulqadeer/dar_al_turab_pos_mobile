@@ -23,8 +23,6 @@ class PosScreen extends ConsumerStatefulWidget {
 }
 
 class _PosScreenState extends ConsumerState<PosScreen> {
-  final _searchController = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -36,12 +34,6 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     Future.microtask(
       () => ref.read(brandingProvider.notifier).refresh(),
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   /// Warehouse/biller are editable for an admin, or a non-admin whose account
@@ -89,14 +81,12 @@ class _PosScreenState extends ConsumerState<PosScreen> {
               onBillerChanged: (b) =>
                   ref.read(cartProvider.notifier).setBiller(b),
             ),
-            ProductSearchField(
-              controller: _searchController,
-              onChanged: (value) =>
-                  ref.read(productSearchQueryProvider.notifier).set(value),
-            ),
+            // The product search/list is not shown up front — the cashier taps
+            // "Add product" (the FAB) to open it. Until then this screen shows
+            // only the customer/warehouse/biller and an empty-state prompt.
             Expanded(
               child: cart.isEmpty
-                  ? const ProductResults()
+                  ? const _EmptySalePrompt()
                   : _CartList(cart: cart),
             ),
           ],
@@ -105,13 +95,15 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       bottomNavigationBar: cart.isEmpty
           ? null
           : _CheckoutBar(cart: cart, onCheckout: _checkout),
-      floatingActionButton: cart.isEmpty
-          ? null
-          : FloatingActionButton(
+      // The "+" to add products is always available — it is the only way to
+      // reach the product search now that it is no longer shown inline.
+      floatingActionButton: metadata.hasValue
+          ? FloatingActionButton.extended(
               onPressed: _openProductSearch,
-              tooltip: 'Add item',
-              child: const Icon(Icons.add),
-            ),
+              icon: const Icon(Icons.add),
+              label: const Text('Add product'),
+            )
+          : null,
     );
   }
 
@@ -170,6 +162,47 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       context,
       message,
       kind: isError ? AppMessageKind.error : AppMessageKind.info,
+    );
+  }
+}
+
+/// Shown before any product has been added: a prompt pointing at the
+/// "Add product" button, since the product search is no longer inline.
+class _EmptySalePrompt extends StatelessWidget {
+  const _EmptySalePrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.add_shopping_cart_outlined,
+              size: 48,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'No products yet',
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Tap "Add product" to search the catalogue and add items to '
+              'this sale.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

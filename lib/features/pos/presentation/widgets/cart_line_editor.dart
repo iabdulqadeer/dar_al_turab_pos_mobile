@@ -25,6 +25,8 @@ class CartLineEditor extends StatefulWidget {
 class _CartLineEditorState extends State<CartLineEditor> {
   late final CartLine _line = widget.line;
 
+  final _formKey = GlobalKey<FormState>();
+
   late final TextEditingController _price;
   late final TextEditingController _qty;
   late final TextEditingController _pcs;
@@ -54,18 +56,9 @@ class _CartLineEditorState extends State<CartLineEditor> {
   /// not yet return.
   bool get _canDeriveFromPieces => _line.product.hasPerPieceWeights;
 
-  /// Whether to show the gross/waste fields at all.
-  ///
-  /// POST /sales accepts these for any line, and this business trades by
-  /// weight, so they are offered whenever the sale unit looks like a weight
-  /// — or whenever the line already carries weight data.
-  bool get _isWeightBased {
-    if (_canDeriveFromPieces) return true;
-    if (_line.grossWeight > 0 || _line.wasteQty > 0) return true;
-
-    final unit = _line.unit?.name.toUpperCase() ?? '';
-    return unit == 'KG' || unit == 'G' || unit == 'GRAM' || unit == 'GRAMS';
-  }
+  /// Whether to show the gross/waste fields at all — centralised on [CartLine]
+  /// so the editor and the checkout validation agree.
+  bool get _isWeightBased => _line.isWeightBased;
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +72,9 @@ class _CartLineEditorState extends State<CartLineEditor> {
       child: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
+          child: Form(
+            key: _formKey,
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -98,6 +93,7 @@ class _CartLineEditorState extends State<CartLineEditor> {
                     controller: _pcs,
                     hint: 'Number of pieces',
                     onChanged: _onPiecesChanged,
+                    validator: (v) => _positive(v, 'Pieces'),
                   ),
                   Text(
                     'Derives gross weight, waste, and net from the product\'s '
@@ -115,6 +111,7 @@ class _CartLineEditorState extends State<CartLineEditor> {
                     // No per-piece masters available, so this is recorded on
                     // the sale but cannot derive the weights.
                     onChanged: (v) => setState(() => _line.noOfPcs = v),
+                    validator: (v) => _positive(v, 'Pieces'),
                   ),
                   const SizedBox(height: AppSpacing.md),
                 ],
@@ -134,6 +131,7 @@ class _CartLineEditorState extends State<CartLineEditor> {
                               _line.syncNetFromWeights();
                               _qty.text = _fmt(_line.qty);
                             }),
+                            validator: (v) => _positive(v, 'Gross weight'),
                           ),
                         ],
                       ),
@@ -151,6 +149,7 @@ class _CartLineEditorState extends State<CartLineEditor> {
                               _line.syncNetFromWeights();
                               _qty.text = _fmt(_line.qty);
                             }),
+                            validator: _wasteValidator,
                           ),
                         ],
                       ),
@@ -173,6 +172,11 @@ class _CartLineEditorState extends State<CartLineEditor> {
                           // is read-only; otherwise it's the editable quantity.
                           enabled: !_isWeightBased,
                           onChanged: (v) => setState(() => _line.qty = v),
+                          // The weight-based Net is derived and read-only, so it
+                          // is validated via Gross/Waste, not here.
+                          validator: _isWeightBased
+                              ? null
+                              : (v) => _positive(v, 'Quantity'),
                         ),
                       ],
                     ),
@@ -186,6 +190,7 @@ class _CartLineEditorState extends State<CartLineEditor> {
                         _NumberField(
                           controller: _price,
                           onChanged: (v) => setState(() => _line.unitPrice = v),
+                          validator: (v) => _positive(v, 'Unit price'),
                         ),
                       ],
                     ),
@@ -223,15 +228,14 @@ class _CartLineEditorState extends State<CartLineEditor> {
                   const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: FilledButton(
-                      onPressed: _line.qty > 0
-                          ? () => Navigator.pop(context, _line)
-                          : null,
+                      onPressed: _onDone,
                       child: const Text('Done'),
                     ),
                   ),
                 ],
               ),
             ],
+          ),
           ),
         ),
       ),
@@ -251,6 +255,33 @@ class _CartLineEditorState extends State<CartLineEditor> {
     });
   }
 
+  /// Accepts "Done" only when every required field is valid, showing the error
+  /// against the specific field that is wrong (flutter_app_issues_august_06 #3).
+  void _onDone() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.pop(context, _line);
+    }
+  }
+
+  /// Required, must parse to a number greater than zero.
+  static String? _positive(String? value, String field) {
+    final n = double.tryParse(value?.trim() ?? '');
+    if (n == null) return 'Enter $field.';
+    if (n <= 0) return '$field must be greater than 0.';
+    return null;
+  }
+
+  /// Waste is required and may be 0, but must leave a net weight above zero
+  /// (net = gross − waste), so it cannot meet or exceed the gross weight.
+  String? _wasteValidator(String? value) {
+    final n = double.tryParse(value?.trim() ?? '');
+    if (n == null) return 'Enter waste (0 if none).';
+    if (n < 0) return 'Waste cannot be negative.';
+    final gross = double.tryParse(_gross.text.trim()) ?? 0;
+    if (gross > 0 && n >= gross) return 'Waste must be less than gross weight.';
+    return null;
+  }
+
   /// Trims trailing zeros so a field shows "3" rather than "3.00".
   static String _fmt(double v) {
     if (v == 0) return '';
@@ -265,6 +296,7 @@ class _NumberField extends StatelessWidget {
     required this.onChanged,
     this.hint,
     this.enabled = true,
+    this.validator,
   });
 
   final TextEditingController controller;
@@ -274,15 +306,19 @@ class _NumberField extends StatelessWidget {
   /// A disabled field is read-only — used for the computed Net weight.
   final bool enabled;
 
+  final String? Function(String?)? validator;
+
   @override
   Widget build(BuildContext context) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       enabled: enabled,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
       ],
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      validator: validator,
       // No isDense: these weight/price fields are the cashier's main tap
       // targets, so they keep the theme's full ~52px height for glove use.
       decoration: InputDecoration(

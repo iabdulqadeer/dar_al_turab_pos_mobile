@@ -121,6 +121,29 @@ class CartLine {
   /// the server is the authority and rejects with INSUFFICIENT_STOCK.
   bool get exceedsStock => qty > product.stock + 0.0001;
 
+  /// Whether this line uses the weight form (pieces / gross / waste / net)
+  /// rather than a simple quantity. Driven purely by the unit or per-piece
+  /// data — never a product name — so a product gets the right form as soon as
+  /// its unit is configured correctly.
+  bool get isWeightBased {
+    if (product.hasPerPieceWeights) return true;
+    if (grossWeight > 0 || wasteQty > 0) return true;
+    final u = unit?.name.toUpperCase() ?? '';
+    return u == 'KG' || u == 'G' || u == 'GRAM' || u == 'GRAMS';
+  }
+
+  /// Whether every field this line needs has a usable value. A weight line
+  /// needs pieces, gross weight and net (gross − waste) all > 0; a simple line
+  /// needs a quantity > 0. Both need a unit and a unit price > 0. Shared by the
+  /// line editor's "Done" gate and the checkout's per-line validation.
+  bool get isComplete {
+    if (unit == null || unitPrice <= 0) return false;
+    if (isWeightBased) {
+      return noOfPcs > 0 && grossWeight > 0 && qty > 0;
+    }
+    return qty > 0;
+  }
+
   /// Recomputes weight fields from a piece count, mirroring the web form.
   ///
   /// Per-piece values are stored in GRAMS, hence the /1000. Only applies to
@@ -257,11 +280,18 @@ class Cart {
     if (customer == null) return 'Choose a customer.';
     if (warehouse == null) return 'Choose a warehouse.';
     if (biller == null) return 'Choose a biller.';
-    if (lines.any((l) => l.qty <= 0)) {
-      return 'Every line needs a quantity greater than zero.';
-    }
     if (lines.any((l) => l.unit == null)) {
       return 'Every line needs a unit.';
+    }
+    // Every line must have complete, valid details — not just the last edited
+    // one (flutter_app_issues_august_06 #4).
+    if (lines.any((l) => !l.isComplete)) {
+      return 'Product details are not correct, please check the product details.';
+    }
+    // A sale must have a real total; an all-zero basket cannot be saved
+    // (flutter_app_issues_august_06 #2).
+    if (grandTotal <= 0) {
+      return 'The sale total must be greater than zero.';
     }
     return null;
   }
