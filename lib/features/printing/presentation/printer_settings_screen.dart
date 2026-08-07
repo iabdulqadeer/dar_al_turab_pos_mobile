@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_overflow_menu.dart';
+import '../../../core/widgets/home_back_button.dart';
 import '../../../data/models/receipt.dart';
 import '../escpos_encoder.dart';
 import '../printer_transport.dart';
@@ -39,6 +40,7 @@ class _PrinterSettingsScreenState
 
     return Scaffold(
       appBar: AppBar(
+        leading: const HomeBackButton(),
         title: const Text('Printer'),
         actions: const [AppOverflowMenu()],
       ),

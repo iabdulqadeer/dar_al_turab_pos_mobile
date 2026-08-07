@@ -6,6 +6,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../core/widgets/app_overflow_menu.dart';
+import '../../../core/widgets/home_back_button.dart';
 import '../../../data/models/auth_user.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../branding/presentation/company_details.dart';
@@ -27,6 +28,7 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leading: const HomeBackButton(),
         title: const Text('Profile'),
         actions: const [AppOverflowMenu()],
       ),
