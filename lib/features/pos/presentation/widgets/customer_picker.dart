@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/sheet_header.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../providers/pos_providers.dart';
 
@@ -56,24 +57,12 @@ class _CustomerPickerState extends ConsumerState<CustomerPicker> {
         height: MediaQuery.of(context).size.height * 0.8,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Customer',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: _fullCreate,
-                    icon: const Icon(Icons.person_add_alt, size: 18),
-                    label: const Text('Add Customer'),
-                  ),
-                ],
+            SheetHeader(
+              title: 'Customer',
+              trailing: TextButton.icon(
+                onPressed: _fullCreate,
+                icon: const Icon(Icons.person_add_alt, size: 18),
+                label: const Text('Add Customer'),
               ),
             ),
             Padding(

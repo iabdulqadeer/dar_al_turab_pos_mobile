@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/extensions/formatting.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_message.dart';
+import '../../../../core/widgets/sheet_header.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../providers/pos_providers.dart';
 import 'barcode_scanner_sheet.dart';
@@ -158,6 +160,14 @@ class ProductResults extends ConsumerWidget {
                 } else {
                   ref.read(cartProvider.notifier).addProduct(product);
                 }
+                // Confirm the add. showAppMessage renders in the root overlay,
+                // so it sits above this product-search sheet rather than behind
+                // it.
+                showAppMessage(
+                  context,
+                  '${product.name} added to the sale',
+                  kind: AppMessageKind.success,
+                );
               },
             );
           },
@@ -198,6 +208,10 @@ class _ProductSearchSheetState extends ConsumerState<ProductSearchSheet> {
         height: MediaQuery.of(context).size.height * 0.8,
         child: Column(
           children: [
+            SheetHeader(
+              title: 'Add product',
+              onBack: () => Navigator.pop(context),
+            ),
             ProductSearchField(
               controller: _controller,
               onChanged: (value) =>
