@@ -86,3 +86,6 @@ coverage/
 # Symbols
 app.*.symbols
 app.*.map.json
+
+# Distributable APKs (signed release builds)
+dist/
