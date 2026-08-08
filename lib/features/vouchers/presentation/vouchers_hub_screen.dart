@@ -73,7 +73,9 @@ class VouchersHubScreen extends ConsumerWidget {
   }
 
   void _push(BuildContext context, Widget screen) {
-    Navigator.of(context, rootNavigator: true)
+    // Push on the branch navigator (not the root) so the shell's bottom
+    // navigation bar stays visible on the list/form screens.
+    Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => screen));
   }
 }

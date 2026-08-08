@@ -74,14 +74,14 @@ class _VoucherListScreenState extends ConsumerState<VoucherListScreen> {
   }
 
   Future<void> _create() async {
-    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+    final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => VoucherFormScreen(type: _type)),
     );
     if (ok == true && mounted) _bump();
   }
 
   Future<void> _edit(Voucher v) async {
-    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+    final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => VoucherFormScreen(type: _type, existing: v),
       ),

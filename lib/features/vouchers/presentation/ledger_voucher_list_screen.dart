@@ -57,14 +57,14 @@ class _LedgerVoucherListScreenState
   }
 
   Future<void> _create() async {
-    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+    final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const LedgerVoucherFormScreen()),
     );
     if (ok == true && mounted) _bump();
   }
 
   Future<void> _edit(LedgerPaymentVoucher v) async {
-    final ok = await Navigator.of(context, rootNavigator: true).push<bool>(
+    final ok = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => LedgerVoucherFormScreen(existing: v),
       ),
