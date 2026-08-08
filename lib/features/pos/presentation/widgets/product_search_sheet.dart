@@ -6,8 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_message.dart';
 import '../../../../core/widgets/sheet_header.dart';
 import '../../../../data/models/catalogue.dart';
+import '../../domain/cart.dart';
 import '../../providers/pos_providers.dart';
 import 'barcode_scanner_sheet.dart';
+import 'cart_line_editor.dart';
 
 /// Product search box with an inline barcode scan button. Feeds the shared
 /// [productSearchQueryProvider], so it drives both the New Sale results and any
@@ -77,15 +79,12 @@ class ProductSearchField extends StatelessWidget {
   }
 }
 
-/// The product results list.
-///
-/// By default a tap adds the product to the global New-Sale cart. Pass
-/// [onSelected] to route the tap elsewhere instead — the Edit Sale screen
-/// appends the product to its own local cart.
+/// The product results list. A tap is delegated to [onProductTap] — the sheet
+/// opens the product-details form and only then commits the line.
 class ProductResults extends ConsumerWidget {
-  const ProductResults({this.onSelected, super.key});
+  const ProductResults({required this.onProductTap, super.key});
 
-  final void Function(CatalogueProduct product)? onSelected;
+  final void Function(CatalogueProduct product) onProductTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -153,22 +152,7 @@ class ProductResults extends ConsumerWidget {
             final product = products[index];
             return _ProductTile(
               product: product,
-              onTap: () {
-                final handler = onSelected;
-                if (handler != null) {
-                  handler(product);
-                } else {
-                  ref.read(cartProvider.notifier).addProduct(product);
-                }
-                // Confirm the add. showAppMessage renders in the root overlay,
-                // so it sits above this product-search sheet rather than behind
-                // it.
-                showAppMessage(
-                  context,
-                  '${product.name} added to the sale',
-                  kind: AppMessageKind.success,
-                );
-              },
+              onTap: () => onProductTap(product),
             );
           },
         );
@@ -178,12 +162,23 @@ class ProductResults extends ConsumerWidget {
 }
 
 /// A full-height modal sheet wrapping [ProductSearchField] + [ProductResults],
-/// used to add items to an in-progress sale. [onSelected] is forwarded to the
-/// results list.
+/// used to add items to an in-progress sale.
+///
+/// Tapping a product opens the product-details form first; the line is only
+/// committed once its details are entered and confirmed, then the sheet stays
+/// open so more products can be added in one flow.
+///
+/// By default commits go to the global New-Sale cart. The Edit Sale screen
+/// supplies [onAddLine]/[existingLineFor] to target its own local cart instead.
 class ProductSearchSheet extends ConsumerStatefulWidget {
-  const ProductSearchSheet({this.onSelected, super.key});
+  const ProductSearchSheet({this.onAddLine, this.existingLineFor, super.key});
 
-  final void Function(CatalogueProduct product)? onSelected;
+  /// Commits a confirmed line. Null → the global New-Sale cart.
+  final void Function(CartLine line)? onAddLine;
+
+  /// Returns the line already present for [product], so a re-tap edits it
+  /// rather than duplicating it. Null → look in the global cart.
+  final CartLine? Function(CatalogueProduct product)? existingLineFor;
 
   @override
   ConsumerState<ProductSearchSheet> createState() => _ProductSearchSheetState();
@@ -197,6 +192,47 @@ class _ProductSearchSheetState extends ConsumerState<ProductSearchSheet> {
     _controller.dispose();
     super.dispose();
   }
+
+  /// Opens the product-details form for the tapped product and only commits the
+  /// line once it is filled in and confirmed. Cancelling adds nothing and
+  /// returns to the list; a re-tap of an already-added product edits it.
+  Future<void> _handleTap(CatalogueProduct product) async {
+    final rate = ref.read(saleTaxRateProvider);
+    final existing = (widget.existingLineFor ?? _globalExisting)(product);
+    final line = existing?.copy() ?? (CartLine.fromProduct(product)..taxRate = rate);
+
+    final confirmed = await showModalBottomSheet<CartLine>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CartLineEditor(line: line),
+    );
+    if (confirmed == null || !mounted) return;
+
+    // Keep the line on the current global tax rate regardless of what it was
+    // opened with.
+    confirmed.taxRate = rate;
+    (widget.onAddLine ?? _globalCommit)(confirmed);
+
+    // A brief confirmation over the sheet; the item also appears in the sale
+    // once the search sheet is closed. showAppMessage renders in the root
+    // overlay, so it sits above this sheet.
+    showAppMessage(
+      context,
+      existing == null
+          ? '${product.name} added to the sale'
+          : '${product.name} updated',
+      kind: AppMessageKind.success,
+    );
+  }
+
+  CartLine? _globalExisting(CatalogueProduct product) {
+    final lines = ref.read(cartProvider).lines;
+    final index = lines.indexWhere((l) => l.product.id == product.id);
+    return index >= 0 ? lines[index] : null;
+  }
+
+  void _globalCommit(CartLine line) =>
+      ref.read(cartProvider.notifier).upsertLine(line);
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +253,7 @@ class _ProductSearchSheetState extends ConsumerState<ProductSearchSheet> {
               onChanged: (value) =>
                   ref.read(productSearchQueryProvider.notifier).set(value),
             ),
-            Expanded(child: ProductResults(onSelected: widget.onSelected)),
+            Expanded(child: ProductResults(onProductTap: _handleTap)),
           ],
         ),
       ),

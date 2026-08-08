@@ -176,20 +176,17 @@ class CartController extends Notifier<Cart> {
     );
   }
 
-  /// Adds a product, or bumps quantity if the same product is already on a
-  /// line — scanning the same barcode twice should not create two lines.
-  void addProduct(CatalogueProduct product) {
-    final existing = state.lines
-        .where((l) => l.product.id == product.id)
-        .cast<CartLine?>()
-        .firstWhere((_) => true, orElse: () => null);
-
-    if (existing != null) {
-      existing.qty = ((existing.qty + 1) * 100).roundToDouble() / 100;
+  /// Commits a fully-specified line built by the product-details form. Tapping a
+  /// product already in the cart edits its existing line in place rather than
+  /// creating a duplicate; a new product is appended.
+  void upsertLine(CartLine line) {
+    final index = state.lines.indexWhere(
+      (l) => l.product.id == line.product.id,
+    );
+    if (index >= 0) {
+      state.lines[index] = line;
     } else {
-      state.lines.add(
-        CartLine.fromProduct(product)..taxRate = ref.read(saleTaxRateProvider),
-      );
+      state.lines.add(line);
     }
     _touch();
   }

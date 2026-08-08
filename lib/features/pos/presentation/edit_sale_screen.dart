@@ -322,17 +322,30 @@ class _EditSaleScreenState extends ConsumerState<EditSaleScreen> {
     );
   }
 
-  /// Appends a new line via the shared product search, seeding it with the
-  /// current tax rate. The sheet stays open so several items can be added.
+  /// Adds lines via the shared product search. Tapping a product opens its
+  /// details form first and only commits on confirm; the sheet stays open so
+  /// several items can be added, and re-tapping an item edits it in place.
   Future<void> _addProduct(Cart cart) async {
-    final rate = ref.read(saleTaxRateProvider);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (_) => ProductSearchSheet(
-        onSelected: (product) => setState(
-          () => cart.lines.add(CartLine.fromProduct(product)..taxRate = rate),
-        ),
+        existingLineFor: (product) {
+          final index = cart.lines.indexWhere(
+            (l) => l.product.id == product.id,
+          );
+          return index >= 0 ? cart.lines[index] : null;
+        },
+        onAddLine: (line) => setState(() {
+          final index = cart.lines.indexWhere(
+            (l) => l.product.id == line.product.id,
+          );
+          if (index >= 0) {
+            cart.lines[index] = line;
+          } else {
+            cart.lines.add(line);
+          }
+        }),
       ),
     );
   }
