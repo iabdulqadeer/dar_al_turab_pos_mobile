@@ -163,7 +163,11 @@ class _VoucherFormScreenState extends ConsumerState<VoucherFormScreen> {
         if (showCheque) ...[
           TextFormField(
             controller: _chequeNumber,
-            decoration: const InputDecoration(labelText: 'Cheque Number'),
+            style: voucherFieldStyle(context),
+            decoration: const InputDecoration(
+              labelText: 'Cheque Number',
+              isDense: true,
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           VoucherDateField(
@@ -275,6 +279,7 @@ class _VoucherFormScreenState extends ConsumerState<VoucherFormScreen> {
                       controller: _payCtrls[inv.invoiceId],
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      style: voucherFieldStyle(context),
                       decoration: const InputDecoration(
                           labelText: 'Pay Amount', isDense: true),
                       onChanged: (v) =>
@@ -287,6 +292,7 @@ class _VoucherFormScreenState extends ConsumerState<VoucherFormScreen> {
                       initialValue: _trimZeros(inv.discountAmount),
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      style: voucherFieldStyle(context),
                       decoration: const InputDecoration(
                           labelText: 'Discount', isDense: true),
                       onChanged: (v) {
@@ -302,6 +308,7 @@ class _VoucherFormScreenState extends ConsumerState<VoucherFormScreen> {
               const SizedBox(height: AppSpacing.xs),
               TextFormField(
                 initialValue: inv.note,
+                style: voucherFieldStyle(context),
                 decoration: const InputDecoration(
                     labelText: 'Note', isDense: true),
                 onChanged: (v) => inv.note = v,
@@ -393,6 +400,16 @@ class _VoucherFormScreenState extends ConsumerState<VoucherFormScreen> {
     if (_paymentMethod == 'deposit' && _bank == null) {
       _toast('Select a bank.', isError: true);
       return;
+    }
+    if (_paymentMethod == 'cheque') {
+      if (_chequeNumber.text.trim().isEmpty) {
+        _toast('Enter the cheque number.', isError: true);
+        return;
+      }
+      if (_chequeDate == null) {
+        _toast('Select the cheque date.', isError: true);
+        return;
+      }
     }
 
     final body = <String, dynamic>{

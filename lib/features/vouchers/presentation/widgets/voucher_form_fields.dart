@@ -4,10 +4,19 @@ import '../../../../data/models/catalogue.dart' show NamedRef;
 import '../../../../data/models/voucher.dart';
 
 /// Small form controls shared by the CRV/CPV and Ledger voucher forms.
+///
+/// All of them render their content at [voucherFieldStyle] (the theme's
+/// `bodyMedium`, in the app's Nunito family) and use dense decoration, so every
+/// voucher field — dropdowns, pickers, text fields — is the same size and shape.
 
 String voucherFormatDate(DateTime d) =>
     '${d.year}-${_two(d.month)}-${_two(d.day)}';
 String _two(int n) => n.toString().padLeft(2, '0');
+
+/// The single content text style every voucher field uses. Keeps the whole
+/// module on one font size/family, inherited from the app theme.
+TextStyle? voucherFieldStyle(BuildContext context) =>
+    Theme.of(context).textTheme.bodyMedium;
 
 class VoucherDateField extends StatelessWidget {
   const VoucherDateField({
@@ -34,11 +43,15 @@ class VoucherDateField extends StatelessWidget {
         if (picked != null) onChanged(picked);
       },
       child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
+        isEmpty: value == null,
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixIcon: Icon(Icons.calendar_today, size: 18),
+        ).copyWith(labelText: label),
+        child: Text(
+          value == null ? '' : voucherFormatDate(value!),
+          style: voucherFieldStyle(context),
         ),
-        child: Text(value == null ? 'Select date' : voucherFormatDate(value!)),
       ),
     );
   }
@@ -62,11 +75,26 @@ class VoucherDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = voucherFieldStyle(context);
     return DropdownButtonFormField<T>(
       initialValue: items.contains(value) ? value : null,
-      decoration: InputDecoration(labelText: label),
+      // Constrain to the field width so a long value ellipsizes inside the box
+      // instead of overflowing past it.
+      isExpanded: true,
+      style: style,
+      decoration: InputDecoration(labelText: label, isDense: true),
       items: items
-          .map((i) => DropdownMenuItem(value: i, child: Text(labelFor(i))))
+          .map(
+            (i) => DropdownMenuItem(
+              value: i,
+              child: Text(
+                labelFor(i),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+          )
           .toList(),
       onChanged: (v) {
         if (v != null) onChanged(v);
@@ -95,14 +123,30 @@ class VoucherRefDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final style = voucherFieldStyle(context);
     final match = items.where((i) => i.id == value?.id).cast<NamedRef?>();
     return DropdownButtonFormField<NamedRef>(
       initialValue: match.isEmpty ? null : match.first,
+      // Constrain to the field width so a long name (e.g. the full company
+      // warehouse name) ellipsizes inside the box instead of overflowing.
+      isExpanded: true,
+      style: style,
       decoration: InputDecoration(
         labelText: optional ? '$label (optional)' : label,
+        isDense: true,
       ),
       items: items
-          .map((i) => DropdownMenuItem(value: i, child: Text(i.name)))
+          .map(
+            (i) => DropdownMenuItem(
+              value: i,
+              child: Text(
+                i.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+          )
           .toList(),
       onChanged: enabled ? onChanged : null,
     );
@@ -128,11 +172,17 @@ class VoucherPersonField extends StatelessWidget {
     return InkWell(
       onTap: enabled ? onTap : null,
       child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          suffixIcon: const Icon(Icons.search, size: 18),
+        isEmpty: person == null,
+        decoration: const InputDecoration(
+          isDense: true,
+          suffixIcon: Icon(Icons.search, size: 18),
+        ).copyWith(labelText: label),
+        child: Text(
+          person?.name ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: voucherFieldStyle(context),
         ),
-        child: Text(person?.name ?? 'Select $label'),
       ),
     );
   }

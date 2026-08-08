@@ -189,7 +189,14 @@ class _LedgerVoucherFormScreenState
           if (showCheque) ...[
             TextFormField(
               controller: _chequeNo,
-              decoration: const InputDecoration(labelText: 'Cheque Number'),
+              style: voucherFieldStyle(context),
+              decoration: const InputDecoration(
+                labelText: 'Cheque Number',
+                isDense: true,
+              ),
+              validator: (v) => (v == null || v.trim().isEmpty)
+                  ? 'Enter the cheque number'
+                  : null,
             ),
             const SizedBox(height: AppSpacing.md),
             VoucherDateField(
@@ -203,7 +210,11 @@ class _LedgerVoucherFormScreenState
           TextFormField(
             controller: _amount,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Amount'),
+            style: voucherFieldStyle(context),
+            decoration: const InputDecoration(
+              labelText: 'Amount',
+              isDense: true,
+            ),
             validator: (v) {
               final amount = double.tryParse(v?.trim() ?? '');
               if (amount == null || amount < 0.01) {
@@ -217,9 +228,11 @@ class _LedgerVoucherFormScreenState
           TextFormField(
             controller: _details,
             maxLines: 2,
+            style: voucherFieldStyle(context),
             decoration: const InputDecoration(
               labelText: 'Details',
               hintText: 'Optional',
+              isDense: true,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -270,6 +283,10 @@ class _LedgerVoucherFormScreenState
     }
     if (_paymentMethod == 'bank' && _bank == null) {
       _toast('Select a bank.', isError: true);
+      return;
+    }
+    if (_paymentMethod == 'cheque' && _chequeDate == null) {
+      _toast('Select the cheque date.', isError: true);
       return;
     }
 
