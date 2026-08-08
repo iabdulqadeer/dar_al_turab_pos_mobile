@@ -25,6 +25,34 @@ abstract final class AppConfig {
 
   static const appName = 'Dar Al Turab POS';
 
+  /// The permanent production endpoint. An alias of [apiBaseUrl] for call sites
+  /// that want to be explicit that they mean "production, not the dev server".
+  static const productionBaseUrl = apiBaseUrl;
+
+  /// Seed value for the editable **dev** server URL in Server Settings. A dev
+  /// machine's LAN IP changes across networks and restarts, so this is only a
+  /// starting point — the field is editable at runtime.
+  ///
+  /// `10.0.2.2` is the Android emulator's alias for its host machine; on a
+  /// physical test device replace it with the dev machine's LAN IP. Note the
+  /// URL ends at `/api/` (no `v1`) because request paths already add `v1/`.
+  static const defaultDevBaseUrl = String.fromEnvironment(
+    'DEV_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8765/api/',
+  );
+
+  /// Whether the Dev/Production server toggle is present at all.
+  ///
+  /// Defaults to on so internal test builds carry it. Strip it from the build
+  /// that ships to business staff — an accidental switch to an offline dev
+  /// server would be confusing and hard to diagnose remotely — by building with
+  /// `--dart-define=ENABLE_SERVER_TOGGLE=false`. When off, the app is locked to
+  /// [productionBaseUrl] and the Server Settings entry is hidden.
+  static const enableServerToggle = bool.fromEnvironment(
+    'ENABLE_SERVER_TOGGLE',
+    defaultValue: true,
+  );
+
   /// Trailing slash matters: Dio joins relative paths against the base URL.
   static String normalizeBaseUrl(String url) {
     final trimmed = url.trim();
@@ -32,3 +60,7 @@ abstract final class AppConfig {
     return trimmed.endsWith('/') ? trimmed : '$trimmed/';
   }
 }
+
+/// Which backend the app talks to. Dev is a local/LAN server entered by the
+/// tester; production is the permanent [AppConfig.productionBaseUrl].
+enum ServerMode { dev, production }

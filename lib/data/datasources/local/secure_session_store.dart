@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/config/app_config.dart';
+
 /// Persists the Sanctum bearer token and the API base URL.
 ///
 /// The token is stored in the platform keystore rather than
@@ -18,6 +20,8 @@ class SecureSessionStore {
 
   static const _tokenKey = 'auth_token';
   static const _baseUrlKey = 'api_base_url';
+  static const _serverModeKey = 'server_mode';
+  static const _devBaseUrlKey = 'dev_base_url';
 
   final FlutterSecureStorage _storage;
 
@@ -49,4 +53,23 @@ class SecureSessionStore {
 
   Future<void> writeBaseUrl(String url) =>
       _storage.write(key: _baseUrlKey, value: url);
+
+  /// The selected server mode. Defaults to [ServerMode.production] when nothing
+  /// has been chosen — the safe side, so a fresh install never silently starts
+  /// against a dev server.
+  Future<ServerMode> readServerMode() async {
+    final value = await _storage.read(key: _serverModeKey);
+    return value == 'dev' ? ServerMode.dev : ServerMode.production;
+  }
+
+  Future<void> writeServerMode(ServerMode mode) => _storage.write(
+    key: _serverModeKey,
+    value: mode == ServerMode.dev ? 'dev' : 'production',
+  );
+
+  /// The editable dev server URL. Null until the tester saves one.
+  Future<String?> readDevBaseUrl() => _storage.read(key: _devBaseUrlKey);
+
+  Future<void> writeDevBaseUrl(String url) =>
+      _storage.write(key: _devBaseUrlKey, value: url);
 }

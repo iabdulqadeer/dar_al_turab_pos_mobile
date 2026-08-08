@@ -5,6 +5,7 @@ import 'core/config/app_config.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_mode_provider.dart';
+import 'core/widgets/dev_mode_banner.dart';
 import 'features/auth/providers/auth_providers.dart';
 import 'features/branding/providers/branding_providers.dart';
 import 'features/printing/providers/printer_providers.dart';
@@ -69,6 +70,9 @@ class _DarAlTurabPosAppState extends ConsumerState<DarAlTurabPosApp>
       darkTheme: AppTheme.dark,
       themeMode: ref.watch(themeModeProvider),
       routerConfig: router,
+      // A persistent DEV-server strip above every screen while dev mode is on.
+      builder: (context, child) =>
+          DevModeBanner(child: child ?? const SizedBox.shrink()),
     );
   }
 }

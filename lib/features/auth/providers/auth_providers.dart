@@ -68,9 +68,15 @@ class AuthController extends Notifier<AuthState> {
   /// because permissions and warehouse assignment can change server-side, and
   /// `EnsureUserIsActive` can revoke access at any time.
   Future<void> restore() async {
-    final baseUrl = await _store.readBaseUrl();
-    if (baseUrl != null && baseUrl.isNotEmpty) {
-      ref.read(apiClientProvider).baseUrl = baseUrl;
+    if (AppConfig.enableServerToggle) {
+      final baseUrl = await _store.readBaseUrl();
+      if (baseUrl != null && baseUrl.isNotEmpty) {
+        ref.read(apiClientProvider).baseUrl = baseUrl;
+      }
+    } else {
+      // Locked build: ignore any stored override (e.g. a dev URL carried over
+      // from a previous internal build) and pin to production.
+      ref.read(apiClientProvider).baseUrl = AppConfig.productionBaseUrl;
     }
 
     final token = await _store.readToken();
@@ -136,10 +142,14 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  Future<void> setBaseUrl(String url) async {
-    final normalized = AppConfig.normalizeBaseUrl(url);
-    await _store.writeBaseUrl(normalized);
-    ref.read(apiClientProvider).baseUrl = normalized;
+  /// Ends the session after a server switch. A token issued by one server's
+  /// database is meaningless against another, so switching must never carry a
+  /// stale token across — clear it and send the user back to login.
+  Future<void> switchServer() async {
+    await _store.clearToken();
+    state = const AuthSignedOut(
+      message: 'Server changed. Please sign in again.',
+    );
   }
 
   /// Sanctum names the token after the device, which is what a future device
@@ -183,3 +193,75 @@ final currentUserProvider = Provider<AuthUser?>((ref) {
 final hasPermissionProvider = Provider.family<bool, String>((ref, permission) {
   return ref.watch(currentUserProvider)?.can(permission) ?? false;
 });
+
+/// The selected server (dev vs production) and the editable dev URL. Persisted,
+/// so it survives a restart, and mirrored onto the Dio client's base URL.
+class ServerSettings {
+  const ServerSettings({required this.mode, required this.devBaseUrl});
+
+  final ServerMode mode;
+  final String devBaseUrl;
+
+  bool get isDev => mode == ServerMode.dev;
+
+  /// The URL requests actually go to for this selection.
+  String get effectiveBaseUrl => mode == ServerMode.dev
+      ? AppConfig.normalizeBaseUrl(devBaseUrl)
+      : AppConfig.productionBaseUrl;
+
+  ServerSettings copyWith({ServerMode? mode, String? devBaseUrl}) =>
+      ServerSettings(
+        mode: mode ?? this.mode,
+        devBaseUrl: devBaseUrl ?? this.devBaseUrl,
+      );
+}
+
+class ServerSettingsController extends Notifier<ServerSettings> {
+  @override
+  ServerSettings build() {
+    // Start on the safe side; _load() replaces this with the stored choice.
+    // In a locked build the toggle is absent, so we stay pinned to production.
+    if (AppConfig.enableServerToggle) {
+      _load();
+    }
+    return const ServerSettings(
+      mode: ServerMode.production,
+      devBaseUrl: AppConfig.defaultDevBaseUrl,
+    );
+  }
+
+  SecureSessionStore get _store => ref.read(sessionStoreProvider);
+
+  Future<void> _load() async {
+    final mode = await _store.readServerMode();
+    final devUrl = await _store.readDevBaseUrl() ?? AppConfig.defaultDevBaseUrl;
+    state = ServerSettings(mode: mode, devBaseUrl: devUrl);
+  }
+
+  /// Persists the chosen server, points Dio at it, and — because tokens are not
+  /// portable between servers — clears the session and forces re-login whenever
+  /// the effective URL actually changes.
+  Future<void> save({
+    required ServerMode mode,
+    required String devBaseUrl,
+  }) async {
+    final normalizedDev = AppConfig.normalizeBaseUrl(devBaseUrl);
+    final next = ServerSettings(mode: mode, devBaseUrl: normalizedDev);
+    final changed = next.effectiveBaseUrl != state.effectiveBaseUrl;
+
+    await _store.writeServerMode(mode);
+    await _store.writeDevBaseUrl(normalizedDev);
+    await _store.writeBaseUrl(next.effectiveBaseUrl);
+    ref.read(apiClientProvider).baseUrl = next.effectiveBaseUrl;
+    state = next;
+
+    if (changed) {
+      await ref.read(authControllerProvider.notifier).switchServer();
+    }
+  }
+}
+
+final serverSettingsControllerProvider =
+    NotifierProvider<ServerSettingsController, ServerSettings>(
+      ServerSettingsController.new,
+    );

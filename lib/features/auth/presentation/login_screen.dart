@@ -194,11 +194,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                     const SizedBox(height: AppSpacing.md),
 
-                    TextButton.icon(
-                      onPressed: _submitting ? null : _showServerSettings,
-                      icon: const Icon(Icons.dns_outlined, size: 18),
-                      label: const Text('Server settings'),
-                    ),
+                    // Only internal/test builds expose the server switch; it is
+                    // stripped from the staff production build.
+                    if (AppConfig.enableServerToggle)
+                      TextButton.icon(
+                        onPressed: _submitting ? null : _showServerSettings,
+                        icon: const Icon(Icons.dns_outlined, size: 18),
+                        label: const Text('Server settings'),
+                      ),
                       ],
                     ),
                   ),
@@ -214,65 +217,123 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _showServerSettings() async {
-    final store = ref.read(sessionStoreProvider);
-    final current = await store.readBaseUrl() ?? AppConfig.apiBaseUrl;
-    if (!mounted) return;
+    final current = ref.read(serverSettingsControllerProvider);
 
-    final controller = TextEditingController(text: current);
-    final saved = await showDialog<bool>(
+    final result = await showDialog<ServerSettings>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('API base URL'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.url,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                hintText: 'http://192.168.1.10/dar_al_turab_pos_1/public/api/',
+      builder: (context) => _ServerSettingsDialog(initial: current),
+    );
+    if (result == null || !mounted) return;
+
+    await ref
+        .read(serverSettingsControllerProvider.notifier)
+        .save(mode: result.mode, devBaseUrl: result.devBaseUrl);
+
+    if (mounted) {
+      showAppMessage(
+        context,
+        result.isDev
+            ? 'Now using the DEV server. Please sign in again.'
+            : 'Now using the PRODUCTION server. Please sign in again.',
+        kind: AppMessageKind.success,
+      );
+    }
+  }
+}
+
+/// The Dev/Production server picker shown from the login screen. Returns the
+/// chosen [ServerSettings] on Save, or null on Cancel.
+class _ServerSettingsDialog extends StatefulWidget {
+  const _ServerSettingsDialog({required this.initial});
+
+  final ServerSettings initial;
+
+  @override
+  State<_ServerSettingsDialog> createState() => _ServerSettingsDialogState();
+}
+
+class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
+  late ServerMode _mode = widget.initial.mode;
+  late final TextEditingController _devUrl = TextEditingController(
+    text: widget.initial.devBaseUrl,
+  );
+
+  @override
+  void dispose() {
+    _devUrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDev = _mode == ServerMode.dev;
+
+    return AlertDialog(
+      title: const Text('Server settings'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<ServerMode>(
+            segments: const [
+              ButtonSegment(
+                value: ServerMode.dev,
+                label: Text('Dev'),
+                icon: Icon(Icons.build_outlined),
               ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Point this at the Laravel /api endpoint. Use the server\'s LAN '
-              'IP when running on a physical device.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+              ButtonSegment(
+                value: ServerMode.production,
+                label: Text('Production'),
+                icon: Icon(Icons.cloud_outlined),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (s) => setState(() => _mode = s.first),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _devUrl,
+            enabled: isDev,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Dev server URL',
+              hintText: 'http://10.0.2.2:8765/api/',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            isDev
+                ? 'All requests will go to this dev server. Ends at /api/ — the '
+                      'app adds v1/ itself. Use the dev machine\'s LAN IP on a '
+                      'physical device (10.0.2.2 is emulator-only).'
+                : 'All requests will go to the live production server.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Switching servers signs you out — you\'ll need to log in again.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(
+            context,
+            ServerSettings(mode: _mode, devBaseUrl: _devUrl.text.trim()),
+          ),
+          child: const Text('Save'),
+        ),
+      ],
     );
-
-    // Read the field before disposing the controller — using it afterwards
-    // throws "A TextEditingController was used after being disposed".
-    final entered = controller.text.trim();
-    controller.dispose();
-
-    if (saved ?? false) {
-      await ref
-          .read(authControllerProvider.notifier)
-          .setBaseUrl(entered);
-      if (mounted) {
-        showAppMessage(
-          context,
-          'Server address updated.',
-          kind: AppMessageKind.success,
-        );
-      }
-    }
   }
 }
 
