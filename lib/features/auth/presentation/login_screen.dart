@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/server_probe.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_message.dart';
@@ -258,10 +259,26 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
     text: widget.initial.devBaseUrl,
   );
 
+  bool _testing = false;
+  ServerProbeResult? _probe;
+
   @override
   void dispose() {
     _devUrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _testConnection() async {
+    setState(() {
+      _testing = true;
+      _probe = null;
+    });
+    final result = await probeServer(_devUrl.text.trim());
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _probe = result;
+    });
   }
 
   @override
@@ -297,17 +314,39 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
             enabled: isDev,
             keyboardType: TextInputType.url,
             autocorrect: false,
+            onChanged: (_) {
+              if (_probe != null) setState(() => _probe = null);
+            },
             decoration: const InputDecoration(
               labelText: 'Dev server URL',
-              hintText: 'http://10.0.2.2:8765/api/',
+              hintText: 'http://localhost:8080/.../public/api/',
             ),
           ),
+          if (isDev) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _testing ? null : _testConnection,
+                icon: _testing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.wifi_tethering, size: 18),
+                label: Text(_testing ? 'Testing…' : 'Test connection'),
+              ),
+            ),
+            if (_probe case final probe?) _ProbeStatus(result: probe),
+          ],
           const SizedBox(height: AppSpacing.sm),
           Text(
             isDev
-                ? 'All requests will go to this dev server. Ends at /api/ — the '
-                      'app adds v1/ itself. Use the dev machine\'s LAN IP on a '
-                      'physical device (10.0.2.2 is emulator-only).'
+                ? 'All requests go to this dev server. It ends at /api/ — the app '
+                      'adds v1/ itself. Over USB, run "adb reverse tcp:8080 '
+                      'tcp:80" and keep localhost:8080; over Wi-Fi use the dev '
+                      'machine\'s LAN IP.'
                 : 'All requests will go to the live production server.',
             style: theme.textTheme.bodySmall,
           ),
@@ -333,6 +372,41 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
           child: const Text('Save'),
         ),
       ],
+    );
+  }
+}
+
+/// A compact pass/fail line under the "Test connection" button.
+class _ProbeStatus extends StatelessWidget {
+  const _ProbeStatus({required this.result});
+
+  final ServerProbeResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = switch (result.status) {
+      ServerProbeStatus.reachableApi => AppColors.success,
+      ServerProbeStatus.reachableNotApi => AppColors.warning,
+      ServerProbeStatus.unreachable => theme.colorScheme.error,
+    };
+    final icon = result.ok ? Icons.check_circle_outline : Icons.error_outline;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              result.detail,
+              style: theme.textTheme.bodySmall?.copyWith(color: color),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

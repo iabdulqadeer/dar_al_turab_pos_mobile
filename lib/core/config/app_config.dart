@@ -29,16 +29,21 @@ abstract final class AppConfig {
   /// that want to be explicit that they mean "production, not the dev server".
   static const productionBaseUrl = apiBaseUrl;
 
-  /// Seed value for the editable **dev** server URL in Server Settings. A dev
-  /// machine's LAN IP changes across networks and restarts, so this is only a
-  /// starting point — the field is editable at runtime.
+  /// Seed value for the editable **dev** server URL in Server Settings. Only a
+  /// starting point — the field is editable at runtime, and "Test" in the
+  /// dialog confirms a URL is reachable before you switch to it.
   ///
-  /// `10.0.2.2` is the Android emulator's alias for its host machine; on a
-  /// physical test device replace it with the dev machine's LAN IP. Note the
-  /// URL ends at `/api/` (no `v1`) because request paths already add `v1/`.
+  /// The default targets the WAMP dev server over a USB `adb reverse` tunnel:
+  ///   adb reverse tcp:8080 tcp:80
+  /// maps the phone's `localhost:8080` to the dev machine's port 80, so this
+  /// works on a physical device regardless of Wi-Fi. When testing over Wi-Fi
+  /// instead, replace `localhost:8080` with the dev machine's LAN IP (e.g.
+  /// `http://192.168.1.5/dar_al_turab_pos_1/public/api/`).
+  ///
+  /// Note the URL ends at `/api/` (no `v1`) — request paths already add `v1/`.
   static const defaultDevBaseUrl = String.fromEnvironment(
     'DEV_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8765/api/',
+    defaultValue: 'http://localhost:8080/dar_al_turab_pos_1/public/api/',
   );
 
   /// Whether the Dev/Production server toggle is present at all.
