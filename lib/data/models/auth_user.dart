@@ -81,4 +81,13 @@ abstract final class Permissions {
   static const salesAdd = 'sales-add';
   static const salesEdit = 'sales-edit';
   static const salesDelete = 'sales-delete';
+
+  // Cash Received / Cash Payment vouchers. Ledger Payment Vouchers are gated
+  // by role only (any user creates; admin-only edit/delete), no permission
+  // string — see the vouchers module doc §4.
+  static const cashReceivedVoucher = 'cash-received-voucher';
+  static const cashPaymentVoucher = 'cash-payment-voucher';
+  static const addCashVoucher = 'add-cash-voucher';
+  static const editCashVoucher = 'edit-cash-voucher';
+  static const deleteCashVoucher = 'delete-cash-voucher';
 }
