@@ -10,6 +10,7 @@ import '../../auth/providers/auth_providers.dart';
 import '../providers/voucher_providers.dart';
 import 'ledger_voucher_form_screen.dart';
 import 'widgets/paged_list_view.dart';
+import 'widgets/voucher_icon.dart';
 
 /// List of Ledger Payment Vouchers. Any user can create; only an admin sees
 /// Edit/Delete (the server rejects both for non-admins, even on their own row).
@@ -123,6 +124,10 @@ class _LedgerRow extends StatelessWidget {
 
     return ListTile(
       onTap: isAdmin ? onEdit : null,
+      leading: VoucherLeadingIcon(
+        icon: ledgerVoucherIcon,
+        color: AppColors.primary,
+      ),
       title: Text(
         voucher.voucherNo,
         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),

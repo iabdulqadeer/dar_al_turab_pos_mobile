@@ -7,6 +7,7 @@ import '../../../data/models/voucher.dart';
 import '../../auth/providers/auth_providers.dart';
 import 'ledger_voucher_list_screen.dart';
 import 'voucher_list_screen.dart';
+import 'widgets/voucher_icon.dart';
 
 /// The Vouchers tab: a hub listing the voucher types the user may access.
 /// Submenu visibility follows the role rules in the vouchers doc §4.
@@ -29,8 +30,8 @@ class VouchersHubScreen extends ConsumerWidget {
         children: [
           if (showCrv)
             _VoucherTypeTile(
-              icon: Icons.south_west,
-              color: AppColors.success,
+              icon: voucherIcon(VoucherType.crv),
+              color: voucherColor(VoucherType.crv),
               title: VoucherType.crv.title,
               subtitle: 'Receive cash from a customer',
               onTap: () => _push(
@@ -40,8 +41,8 @@ class VouchersHubScreen extends ConsumerWidget {
             ),
           if (showCpv)
             _VoucherTypeTile(
-              icon: Icons.north_east,
-              color: AppColors.warning,
+              icon: voucherIcon(VoucherType.cpv),
+              color: voucherColor(VoucherType.cpv),
               title: VoucherType.cpv.title,
               subtitle: 'Pay cash to a supplier',
               onTap: () => _push(
@@ -50,7 +51,7 @@ class VouchersHubScreen extends ConsumerWidget {
               ),
             ),
           _VoucherTypeTile(
-            icon: Icons.account_balance_wallet_outlined,
+            icon: ledgerVoucherIcon,
             color: AppColors.primary,
             title: 'Ledger Payment Voucher',
             subtitle: 'Standalone debit / credit entry',
@@ -99,10 +100,7 @@ class _VoucherTypeTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: ListTile(
         onTap: onTap,
-        leading: CircleAvatar(
-          backgroundColor: color.withValues(alpha: 0.15),
-          child: Icon(icon, color: color),
-        ),
+        leading: VoucherLeadingIcon(icon: icon, color: color, size: 40),
         title: Text(title,
             style: theme.textTheme.bodyLarge
                 ?.copyWith(fontWeight: FontWeight.w700)),

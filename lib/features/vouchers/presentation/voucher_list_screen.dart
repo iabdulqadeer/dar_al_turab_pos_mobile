@@ -11,6 +11,7 @@ import '../../auth/providers/auth_providers.dart';
 import '../providers/voucher_providers.dart';
 import 'voucher_form_screen.dart';
 import 'widgets/paged_list_view.dart';
+import 'widgets/voucher_icon.dart';
 
 /// List of Cash Received (CRV) or Cash Payment (CPV) vouchers, parameterised by
 /// [type]. Add/Edit/Delete are gated per the role rules in the vouchers doc §4.
@@ -53,6 +54,7 @@ class _VoucherListScreenState extends ConsumerState<VoucherListScreen> {
         fetch: (page) => api.list(VoucherListQuery(type: _type), page: page),
         itemBuilder: (context, v) => _VoucherRow(
           voucher: v,
+          type: _type,
           canEdit: _canModify(user, Permissions.editCashVoucher, v),
           canDelete: _canModify(user, Permissions.deleteCashVoucher, v),
           onEdit: () => _edit(v),
@@ -122,6 +124,7 @@ class _VoucherListScreenState extends ConsumerState<VoucherListScreen> {
 class _VoucherRow extends StatelessWidget {
   const _VoucherRow({
     required this.voucher,
+    required this.type,
     required this.canEdit,
     required this.canDelete,
     required this.onEdit,
@@ -129,6 +132,7 @@ class _VoucherRow extends StatelessWidget {
   });
 
   final Voucher voucher;
+  final VoucherType type;
   final bool canEdit;
   final bool canDelete;
   final VoidCallback onEdit;
@@ -141,6 +145,10 @@ class _VoucherRow extends StatelessWidget {
 
     return ListTile(
       onTap: canEdit ? onEdit : null,
+      leading: VoucherLeadingIcon(
+        icon: voucherIcon(type),
+        color: voucherColor(type),
+      ),
       title: Text(
         voucher.voucherNo,
         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
