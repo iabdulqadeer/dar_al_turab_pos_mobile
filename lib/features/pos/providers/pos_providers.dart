@@ -132,8 +132,12 @@ class CartController extends Notifier<Cart> {
         cart.customer = meta.defaultCustomer;
         changed = true;
       }
-      if (cart.biller == null && meta.defaultBiller != null) {
-        cart.biller = meta.defaultBiller;
+      if (cart.biller == null && meta.billers.isNotEmpty) {
+        // Attribute the sale to the logged-in user's own biller when they have
+        // one (a sales-person/biller account); only fall back to the first
+        // biller for accounts not tied to one, e.g. an admin (biller_id null).
+        final ownBillerId = ref.read(currentUserProvider)?.billerId;
+        cart.biller = meta.billerFor(ownBillerId) ?? meta.defaultBiller;
         changed = true;
       }
       // Default to the account's own warehouse (or the first offered, which is

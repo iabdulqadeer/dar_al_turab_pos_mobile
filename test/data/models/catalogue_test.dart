@@ -85,6 +85,27 @@ void main() {
     });
   });
 
+  group('SaleFormMetadata.billerFor', () {
+    final meta = SaleFormMetadata.fromJson({
+      'billers': [
+        {'id': 1, 'name': 'HAMZA ISHFAQ'},
+        {'id': 5, 'name': 'Sara Khan'},
+      ],
+    });
+
+    test('returns the biller matching the user\'s own biller_id', () {
+      expect(meta.billerFor(5)?.name, 'Sara Khan');
+    });
+
+    test('returns null for a null biller_id (e.g. admin)', () {
+      expect(meta.billerFor(null), isNull);
+    });
+
+    test('returns null when no biller matches', () {
+      expect(meta.billerFor(99), isNull);
+    });
+  });
+
   group('CatalogueProduct', () {
     final json = {
       'id': 2,

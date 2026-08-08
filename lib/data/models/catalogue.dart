@@ -394,6 +394,17 @@ class SaleFormMetadata {
 
   NamedRef? get defaultBiller => billers.isEmpty ? null : billers.first;
 
+  /// The biller whose id matches [billerId], or null when no id is given or no
+  /// biller matches. Used to default the New Sale biller to the logged-in
+  /// user's own biller rather than whoever is first in the list.
+  NamedRef? billerFor(int? billerId) {
+    if (billerId == null) return null;
+    for (final biller in billers) {
+      if (biller.id == billerId) return biller;
+    }
+    return null;
+  }
+
   /// The warehouse to actually search stock and customers in.
   ///
   /// Works around a server-side gap: for an admin whose own `warehouse_id` is
