@@ -18,6 +18,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/sales/presentation/sale_detail_screen.dart';
 import '../../features/sales/presentation/sales_list_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/vouchers/presentation/vouchers_hub_screen.dart';
 import '../widgets/app_shell.dart';
 
 abstract final class Routes {
@@ -34,6 +35,7 @@ abstract final class Routes {
   // Bottom-navigation branches. Each is the root of its own stack.
   static const dashboard = '/dashboard';
   static const sales = '/sales';
+  static const vouchers = '/vouchers';
   static const printer = '/printer';
   static const profile = '/profile';
 
@@ -166,6 +168,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                     ],
                   ),
                 ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: Routes.vouchers,
+                builder: (context, state) => const VouchersHubScreen(),
               ),
             ],
           ),

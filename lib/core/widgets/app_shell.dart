@@ -38,6 +38,11 @@ class AppShell extends StatelessWidget {
             label: 'Sales',
           ),
           NavigationDestination(
+            icon: Icon(Icons.request_quote_outlined),
+            selectedIcon: Icon(Icons.request_quote),
+            label: 'Vouchers',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.print_outlined),
             selectedIcon: Icon(Icons.print),
             label: 'Printer',
