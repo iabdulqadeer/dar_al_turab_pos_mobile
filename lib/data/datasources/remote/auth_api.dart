@@ -1,4 +1,5 @@
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
 import '../../models/auth_user.dart';
 
 /// Result of a successful login: the plaintext Sanctum token plus the user.
@@ -33,9 +34,21 @@ class AuthApi {
         'device_name': deviceName,
       },
       parse: (data) {
+        // The ApiClient has already unwrapped the {success, message, data}
+        // envelope, so `data` here IS the login `data` object — the token lives
+        // at `data.token`, never at the envelope root. Guard it explicitly: a
+        // missing/blank token must fail loudly here, not get saved as null and
+        // 401 every request afterwards (login_token_issue_august_12_2026).
         final json = Map<String, dynamic>.from(data as Map);
+        final token = json['token'];
+        if (token is! String || token.isEmpty) {
+          throw const ApiException(
+            code: ApiErrorCode.unexpectedResponse,
+            message: 'Login response did not include an auth token.',
+          );
+        }
         return LoginResult(
-          token: json['token'] as String,
+          token: token,
           user: AuthUser.fromJson(
             Map<String, dynamic>.from(json['user'] as Map),
           ),

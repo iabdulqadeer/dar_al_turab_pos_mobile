@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
+import '../config/app_config.dart';
 import 'api_exception.dart';
 import 'api_response.dart';
 
@@ -49,7 +51,26 @@ class ApiClient {
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          // Diagnostic (internal/test builds only): record whether a token was
+          // attached, without ever logging the token itself. A `GET
+          // settings/general auth=MISSING` right after a login pinpoints the
+          // "token never attached" bug (login_token_issue_august_12_2026).
+          if (AppConfig.enableServerToggle) {
+            final auth = token != null && token.isNotEmpty
+                ? 'attached(len=${token.length})'
+                : 'MISSING';
+            debugPrint('[API] → ${options.method} ${options.uri} auth=$auth');
+          }
           handler.next(options);
+        },
+        onResponse: (response, handler) {
+          if (AppConfig.enableServerToggle) {
+            debugPrint(
+              '[API] ← ${response.statusCode} '
+              '${response.requestOptions.method} ${response.requestOptions.uri}',
+            );
+          }
+          handler.next(response);
         },
       ),
     );
