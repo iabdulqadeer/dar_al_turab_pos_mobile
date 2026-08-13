@@ -200,6 +200,8 @@ class VoucherInvoice {
     required this.discountAmount,
     this.invoiceType,
     this.note,
+    this.createdBy,
+    this.date,
   });
 
   factory VoucherInvoice.fromJson(Map<String, dynamic> json) {
@@ -211,6 +213,10 @@ class VoucherInvoice {
       discountAmount: _toDouble(json['discount_amount']),
       invoiceType: json['invoice_type'] as String?,
       note: json['note'] as String?,
+      // created_by is a {id, name} object on the invoice-payment line (distinct
+      // from the voucher's own top-level created_by, which is a bare user id).
+      createdBy: _ref(json['created_by']),
+      date: json['date'] as String?,
     );
   }
 
@@ -221,6 +227,8 @@ class VoucherInvoice {
   final double discountAmount;
   final String? invoiceType;
   final String? note;
+  final NamedRef? createdBy;
+  final String? date;
 }
 
 /// A saved Cash Received / Cash Payment voucher (list row and detail share it).

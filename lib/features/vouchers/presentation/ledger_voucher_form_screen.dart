@@ -143,17 +143,19 @@ class _LedgerVoucherFormScreenState
           ),
           const SizedBox(height: AppSpacing.md),
 
-          // Sale Person is always shown on LPV, optional, locked when the
-          // server says so.
-          VoucherRefDropdown(
-            label: 'Sale Person',
-            value: _biller,
-            items: form.billers,
-            enabled: !form.billerLocked,
-            optional: true,
-            onChanged: (b) => setState(() => _biller = b),
-          ),
-          const SizedBox(height: AppSpacing.md),
+          // Sale Person: shown and required for a Customer, hidden entirely for
+          // a Supplier (Issue 2, aug 13). Locked + pre-filled when the server
+          // says so (a non-admin with their own biller).
+          if (_personType == 'Customer') ...[
+            VoucherRefDropdown(
+              label: 'Sale Person',
+              value: _biller,
+              items: form.billers,
+              enabled: !form.billerLocked,
+              onChanged: (b) => setState(() => _biller = b),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
 
           VoucherDropdown<String>(
             label: 'Transaction Type',
@@ -289,13 +291,19 @@ class _LedgerVoucherFormScreenState
       _toast('Select the cheque date.', isError: true);
       return;
     }
+    // Sale Person is required when the party is a Customer (Issue 2).
+    if (_personType == 'Customer' && _biller == null) {
+      _toast('Select a Sale Person.', isError: true);
+      return;
+    }
 
     final body = <String, dynamic>{
       'voucher_date': voucherFormatDate(_date),
       'person_type': _personType,
       if (_personType == 'Customer') 'customer_id': _person!.id,
       if (_personType == 'Supplier') 'supplier_id': _person!.id,
-      if (_biller != null) 'biller_id': _biller!.id,
+      // Only a Customer voucher carries a Sale Person; a Supplier one omits it.
+      if (_personType == 'Customer' && _biller != null) 'biller_id': _biller!.id,
       'transaction_type': _transactionType,
       'payment_method': _paymentMethod,
       if (isAdmin && _warehouse != null) 'warehouse_id': _warehouse!.id,

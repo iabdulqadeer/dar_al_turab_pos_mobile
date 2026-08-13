@@ -9,6 +9,7 @@ import '../../../data/models/auth_user.dart';
 import '../../../data/models/voucher.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../providers/voucher_providers.dart';
+import 'voucher_detail_screen.dart';
 import 'voucher_form_screen.dart';
 import 'widgets/paged_list_view.dart';
 import 'widgets/voucher_icon.dart';
@@ -52,14 +53,18 @@ class _VoucherListScreenState extends ConsumerState<VoucherListScreen> {
         emptyMessage: 'No ${_type.title.toLowerCase()}s yet',
         emptyIcon: Icons.receipt_long_outlined,
         fetch: (page) => api.list(VoucherListQuery(type: _type), page: page),
-        itemBuilder: (context, v) => _VoucherRow(
-          voucher: v,
-          type: _type,
-          canEdit: _canModify(user, Permissions.editCashVoucher, v),
-          canDelete: _canModify(user, Permissions.deleteCashVoucher, v),
-          onEdit: () => _edit(v),
-          onDelete: () => _delete(api, v),
-        ),
+        itemBuilder: (context, v) {
+          final canEdit = _canModify(user, Permissions.editCashVoucher, v);
+          return _VoucherRow(
+            voucher: v,
+            type: _type,
+            canEdit: canEdit,
+            canDelete: _canModify(user, Permissions.deleteCashVoucher, v),
+            onView: () => _view(v, canEdit),
+            onEdit: () => _edit(v),
+            onDelete: () => _delete(api, v),
+          );
+        },
       ),
     );
   }
@@ -78,6 +83,16 @@ class _VoucherListScreenState extends ConsumerState<VoucherListScreen> {
       MaterialPageRoute(builder: (_) => VoucherFormScreen(type: _type)),
     );
     if (ok == true && mounted) _bump();
+  }
+
+  Future<void> _view(Voucher v, bool canModify) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => VoucherDetailScreen(voucher: v, canModify: canModify),
+      ),
+    );
+    // Deleting an invoice payment inside View changes the voucher totals.
+    if (changed == true && mounted) _bump();
   }
 
   Future<void> _edit(Voucher v) async {
@@ -127,6 +142,7 @@ class _VoucherRow extends StatelessWidget {
     required this.type,
     required this.canEdit,
     required this.canDelete,
+    required this.onView,
     required this.onEdit,
     required this.onDelete,
   });
@@ -135,16 +151,17 @@ class _VoucherRow extends StatelessWidget {
   final VoucherType type;
   final bool canEdit;
   final bool canDelete;
+  final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasMenu = canEdit || canDelete;
 
     return ListTile(
-      onTap: canEdit ? onEdit : null,
+      // Tapping the row opens the read-only View, never Edit directly.
+      onTap: onView,
       leading: VoucherLeadingIcon(
         icon: voucherIcon(type),
         color: voucherColor(type),
@@ -178,16 +195,20 @@ class _VoucherRow extends StatelessWidget {
               ),
             ],
           ),
-          if (hasMenu)
-            PopupMenuButton<String>(
-              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-              itemBuilder: (_) => [
-                if (canEdit)
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                if (canDelete)
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            ),
+          PopupMenuButton<String>(
+            onSelected: (v) => switch (v) {
+              'view' => onView(),
+              'edit' => onEdit(),
+              _ => onDelete(),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'view', child: Text('View')),
+              if (canEdit)
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+              if (canDelete)
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
+            ],
+          ),
         ],
       ),
     );

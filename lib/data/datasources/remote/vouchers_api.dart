@@ -125,4 +125,14 @@ class VouchersApi {
   /// `DELETE /v1/vouchers/{id}`
   Future<void> destroy(int id) =>
       _client.delete('v1/vouchers/$id', parse: (_) {});
+
+  /// `DELETE /v1/vouchers/{id}/invoice-payments/{invoicePaymentId}` — removes a
+  /// single invoice allocation and returns the updated voucher (recomputed
+  /// totals), without deleting the voucher itself.
+  Future<Voucher> deleteInvoicePayment(int voucherId, int invoicePaymentId) {
+    return _client.delete(
+      'v1/vouchers/$voucherId/invoice-payments/$invoicePaymentId',
+      parse: (data) => Voucher.fromJson(Map<String, dynamic>.from(data as Map)),
+    );
+  }
 }

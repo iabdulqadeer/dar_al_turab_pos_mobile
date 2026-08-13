@@ -8,6 +8,7 @@ import '../../../data/datasources/remote/ledger_payment_vouchers_api.dart';
 import '../../../data/models/voucher.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../providers/voucher_providers.dart';
+import 'ledger_voucher_detail_screen.dart';
 import 'ledger_voucher_form_screen.dart';
 import 'widgets/paged_list_view.dart';
 import 'widgets/voucher_icon.dart';
@@ -49,6 +50,7 @@ class _LedgerVoucherListScreenState
         itemBuilder: (context, v) => _LedgerRow(
           voucher: v,
           isAdmin: isAdmin,
+          onView: () => _view(v),
           onEdit: () => _edit(v),
           onDelete: () => _delete(api, v),
         ),
@@ -61,6 +63,12 @@ class _LedgerVoucherListScreenState
       MaterialPageRoute(builder: (_) => const LedgerVoucherFormScreen()),
     );
     if (ok == true && mounted) _bump();
+  }
+
+  Future<void> _view(LedgerPaymentVoucher v) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LedgerVoucherDetailScreen(voucher: v)),
+    );
   }
 
   Future<void> _edit(LedgerPaymentVoucher v) async {
@@ -108,22 +116,36 @@ class _LedgerRow extends StatelessWidget {
   const _LedgerRow({
     required this.voucher,
     required this.isAdmin,
+    required this.onView,
     required this.onEdit,
     required this.onDelete,
   });
 
   final LedgerPaymentVoucher voucher;
   final bool isAdmin;
+  final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDebit = voucher.transactionType.toLowerCase() == 'debit';
+
+    // Issue 3 (list only): the displayed label is swapped — a stored "credit"
+    // shows as Debit and a stored "debit" shows as Credit. The colour follows
+    // the label shown here, not the stored value. The form is untouched.
+    final stored = voucher.transactionType.toLowerCase();
+    final displayLabel = stored == 'credit'
+        ? 'Debit'
+        : stored == 'debit'
+            ? 'Credit'
+            : voucher.transactionType;
+    final displayIsDebit = displayLabel == 'Debit';
+    final personType = voucher.person?.type;
 
     return ListTile(
-      onTap: isAdmin ? onEdit : null,
+      // Tap opens View; Edit/Delete live in the ⋮ menu (admin only).
+      onTap: onView,
       leading: VoucherLeadingIcon(
         icon: ledgerVoucherIcon,
         color: AppColors.primary,
@@ -132,10 +154,23 @@ class _LedgerRow extends StatelessWidget {
         voucher.voucherNo,
         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
       ),
-      subtitle: Text(
-        '${voucher.person?.name ?? '-'} · ${voucher.date}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${voucher.person?.name ?? '-'} · ${voucher.date}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          // Issue 4: label the party as Customer or Supplier.
+          if (personType != null && personType.isNotEmpty)
+            Text(
+              personType,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -148,25 +183,34 @@ class _LedgerRow extends StatelessWidget {
                 voucher.amount.toStringAsFixed(2),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: isDebit ? AppColors.success : theme.colorScheme.error,
+                  color: displayIsDebit
+                      ? AppColors.success
+                      : theme.colorScheme.error,
                 ),
               ),
               Text(
-                '${isDebit ? 'Debit' : 'Credit'} · ${voucher.paymentMethod}',
+                '$displayLabel · ${voucher.paymentMethod}',
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
           ),
-          if (isAdmin)
-            PopupMenuButton<String>(
-              onSelected: (v) => v == 'edit' ? onEdit() : onDelete(),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
+          PopupMenuButton<String>(
+            onSelected: (v) => switch (v) {
+              'view' => onView(),
+              'edit' => onEdit(),
+              _ => onDelete(),
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'view', child: Text('View')),
+              // LPV Edit/Delete never appear for non-admins, even on own row.
+              if (isAdmin) ...[
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(value: 'delete', child: Text('Delete')),
               ],
-            ),
+            ],
+          ),
         ],
       ),
     );
