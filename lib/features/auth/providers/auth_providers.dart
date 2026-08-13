@@ -194,25 +194,39 @@ final hasPermissionProvider = Provider.family<bool, String>((ref, permission) {
   return ref.watch(currentUserProvider)?.can(permission) ?? false;
 });
 
-/// The selected server (dev vs production) and the editable dev URL. Persisted,
+/// The selected server (dev vs production) and both editable URLs. Persisted,
 /// so it survives a restart, and mirrored onto the Dio client's base URL.
 class ServerSettings {
-  const ServerSettings({required this.mode, required this.devBaseUrl});
+  const ServerSettings({
+    required this.mode,
+    required this.devBaseUrl,
+    required this.prodBaseUrl,
+  });
 
   final ServerMode mode;
   final String devBaseUrl;
+  final String prodBaseUrl;
 
   bool get isDev => mode == ServerMode.dev;
 
-  /// The URL requests actually go to for this selection.
+  /// The URL requests actually go to for this selection. Both URLs are editable;
+  /// an empty one falls back to the production default via [normalizeBaseUrl].
   String get effectiveBaseUrl => mode == ServerMode.dev
       ? AppConfig.normalizeBaseUrl(devBaseUrl)
-      : AppConfig.productionBaseUrl;
+      : AppConfig.normalizeBaseUrl(prodBaseUrl);
 
-  ServerSettings copyWith({ServerMode? mode, String? devBaseUrl}) =>
+  /// The URL entered for [mode] — what "Test connection" should probe.
+  String get selectedUrl => mode == ServerMode.dev ? devBaseUrl : prodBaseUrl;
+
+  ServerSettings copyWith({
+    ServerMode? mode,
+    String? devBaseUrl,
+    String? prodBaseUrl,
+  }) =>
       ServerSettings(
         mode: mode ?? this.mode,
         devBaseUrl: devBaseUrl ?? this.devBaseUrl,
+        prodBaseUrl: prodBaseUrl ?? this.prodBaseUrl,
       );
 }
 
@@ -227,6 +241,7 @@ class ServerSettingsController extends Notifier<ServerSettings> {
     return const ServerSettings(
       mode: ServerMode.production,
       devBaseUrl: AppConfig.defaultDevBaseUrl,
+      prodBaseUrl: AppConfig.productionBaseUrl,
     );
   }
 
@@ -235,22 +250,35 @@ class ServerSettingsController extends Notifier<ServerSettings> {
   Future<void> _load() async {
     final mode = await _store.readServerMode();
     final devUrl = await _store.readDevBaseUrl() ?? AppConfig.defaultDevBaseUrl;
-    state = ServerSettings(mode: mode, devBaseUrl: devUrl);
+    final prodUrl =
+        await _store.readProdBaseUrl() ?? AppConfig.productionBaseUrl;
+    state = ServerSettings(
+      mode: mode,
+      devBaseUrl: devUrl,
+      prodBaseUrl: prodUrl,
+    );
   }
 
-  /// Persists the chosen server, points Dio at it, and — because tokens are not
-  /// portable between servers — clears the session and forces re-login whenever
-  /// the effective URL actually changes.
+  /// Persists the chosen server + both URLs, points Dio at the effective one,
+  /// and — because tokens are not portable between servers — clears the session
+  /// and forces re-login whenever the effective URL actually changes.
   Future<void> save({
     required ServerMode mode,
     required String devBaseUrl,
+    required String prodBaseUrl,
   }) async {
     final normalizedDev = AppConfig.normalizeBaseUrl(devBaseUrl);
-    final next = ServerSettings(mode: mode, devBaseUrl: normalizedDev);
+    final normalizedProd = AppConfig.normalizeBaseUrl(prodBaseUrl);
+    final next = ServerSettings(
+      mode: mode,
+      devBaseUrl: normalizedDev,
+      prodBaseUrl: normalizedProd,
+    );
     final changed = next.effectiveBaseUrl != state.effectiveBaseUrl;
 
     await _store.writeServerMode(mode);
     await _store.writeDevBaseUrl(normalizedDev);
+    await _store.writeProdBaseUrl(normalizedProd);
     await _store.writeBaseUrl(next.effectiveBaseUrl);
     ref.read(apiClientProvider).baseUrl = next.effectiveBaseUrl;
     state = next;

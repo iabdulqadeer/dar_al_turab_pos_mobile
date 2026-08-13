@@ -47,18 +47,20 @@ void main() {
       const settings = ServerSettings(
         mode: ServerMode.dev,
         devBaseUrl: 'http://10.0.2.2:8765/api',
+        prodBaseUrl: 'https://prod.example.com/api/',
       );
       expect(settings.isDev, isTrue);
       expect(settings.effectiveBaseUrl, 'http://10.0.2.2:8765/api/');
     });
 
-    test('production mode ignores the dev URL and uses production', () {
+    test('production mode uses the (editable) production URL', () {
       const settings = ServerSettings(
         mode: ServerMode.production,
         devBaseUrl: 'http://10.0.2.2:8765/api',
+        prodBaseUrl: 'https://prod.example.com/api',
       );
       expect(settings.isDev, isFalse);
-      expect(settings.effectiveBaseUrl, AppConfig.productionBaseUrl);
+      expect(settings.effectiveBaseUrl, 'https://prod.example.com/api/');
     });
   });
 
@@ -89,7 +91,11 @@ void main() {
 
       await container
           .read(serverSettingsControllerProvider.notifier)
-          .save(mode: ServerMode.dev, devBaseUrl: 'http://10.0.2.2:8765/api');
+          .save(
+            mode: ServerMode.dev,
+            devBaseUrl: 'http://10.0.2.2:8765/api',
+            prodBaseUrl: AppConfig.productionBaseUrl,
+          );
 
       final settings = container.read(serverSettingsControllerProvider);
       expect(settings.mode, ServerMode.dev);
@@ -116,10 +122,12 @@ void main() {
       await controller.save(
         mode: ServerMode.dev,
         devBaseUrl: 'http://10.0.2.2:8765/api',
+        prodBaseUrl: AppConfig.productionBaseUrl,
       );
       await controller.save(
         mode: ServerMode.production,
         devBaseUrl: 'http://10.0.2.2:8765/api',
+        prodBaseUrl: AppConfig.productionBaseUrl,
       );
 
       expect(
@@ -130,6 +138,28 @@ void main() {
       expect(
         container.read(apiClientProvider).raw.options.baseUrl,
         AppConfig.productionBaseUrl,
+      );
+    });
+
+    test('production mode honours a custom, edited production URL', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      await container.read(serverSettingsControllerProvider.notifier).save(
+            mode: ServerMode.production,
+            devBaseUrl: AppConfig.defaultDevBaseUrl,
+            prodBaseUrl: 'https://staging.example.com/api',
+          );
+
+      expect(
+        container.read(serverSettingsControllerProvider).effectiveBaseUrl,
+        'https://staging.example.com/api/',
+      );
+      expect(storage['api_base_url'], 'https://staging.example.com/api/');
+      expect(storage['prod_base_url'], 'https://staging.example.com/api/');
+      expect(
+        container.read(apiClientProvider).raw.options.baseUrl,
+        'https://staging.example.com/api/',
       );
     });
   });

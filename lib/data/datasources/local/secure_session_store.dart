@@ -22,6 +22,7 @@ class SecureSessionStore {
   static const _baseUrlKey = 'api_base_url';
   static const _serverModeKey = 'server_mode';
   static const _devBaseUrlKey = 'dev_base_url';
+  static const _prodBaseUrlKey = 'prod_base_url';
 
   final FlutterSecureStorage _storage;
 
@@ -72,4 +73,11 @@ class SecureSessionStore {
 
   Future<void> writeDevBaseUrl(String url) =>
       _storage.write(key: _devBaseUrlKey, value: url);
+
+  /// The editable production server URL. Null until saved (falls back to the
+  /// build-time [AppConfig.productionBaseUrl]).
+  Future<String?> readProdBaseUrl() => _storage.read(key: _prodBaseUrlKey);
+
+  Future<void> writeProdBaseUrl(String url) =>
+      _storage.write(key: _prodBaseUrlKey, value: url);
 }

@@ -228,7 +228,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     await ref
         .read(serverSettingsControllerProvider.notifier)
-        .save(mode: result.mode, devBaseUrl: result.devBaseUrl);
+        .save(
+          mode: result.mode,
+          devBaseUrl: result.devBaseUrl,
+          prodBaseUrl: result.prodBaseUrl,
+        );
 
     if (mounted) {
       showAppMessage(
@@ -258,6 +262,9 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
   late final TextEditingController _devUrl = TextEditingController(
     text: widget.initial.devBaseUrl,
   );
+  late final TextEditingController _prodUrl = TextEditingController(
+    text: widget.initial.prodBaseUrl,
+  );
 
   bool _testing = false;
   ServerProbeResult? _probe;
@@ -265,15 +272,19 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
   @override
   void dispose() {
     _devUrl.dispose();
+    _prodUrl.dispose();
     super.dispose();
   }
 
+  /// Probes the URL of the currently-selected mode.
   Future<void> _testConnection() async {
+    final url =
+        (_mode == ServerMode.dev ? _devUrl : _prodUrl).text.trim();
     setState(() {
       _testing = true;
       _probe = null;
     });
-    final result = await probeServer(_devUrl.text.trim());
+    final result = await probeServer(url);
     if (!mounted) return;
     setState(() {
       _testing = false;
@@ -306,7 +317,10 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
               ),
             ],
             selected: {_mode},
-            onSelectionChanged: (s) => setState(() => _mode = s.first),
+            onSelectionChanged: (s) => setState(() {
+              _mode = s.first;
+              _probe = null; // a probe result belongs to one mode's URL
+            }),
           ),
           const SizedBox(height: AppSpacing.md),
           TextField(
@@ -322,32 +336,49 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
               hintText: 'http://localhost:8080/.../public/api/',
             ),
           ),
-          if (isDev) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _testing ? null : _testConnection,
-                icon: _testing
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.wifi_tethering, size: 18),
-                label: Text(_testing ? 'Testing…' : 'Test connection'),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _prodUrl,
+            enabled: !isDev,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            onChanged: (_) {
+              if (_probe != null) setState(() => _probe = null);
+            },
+            decoration: const InputDecoration(
+              labelText: 'Production server URL',
+              hintText: 'https://app.example.com/api/',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _testing ? null : _testConnection,
+              icon: _testing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.wifi_tethering, size: 18),
+              label: Text(
+                _testing
+                    ? 'Testing…'
+                    : 'Test ${isDev ? 'dev' : 'production'} connection',
               ),
             ),
-            if (_probe case final probe?) _ProbeStatus(result: probe),
-          ],
+          ),
+          if (_probe case final probe?) _ProbeStatus(result: probe),
           const SizedBox(height: AppSpacing.sm),
           Text(
             isDev
-                ? 'All requests go to this dev server. It ends at /api/ — the app '
+                ? 'All requests go to the Dev URL. It ends at /api/ — the app '
                       'adds v1/ itself. Over USB, run "adb reverse tcp:8080 '
                       'tcp:80" and keep localhost:8080; over Wi-Fi use the dev '
                       'machine\'s LAN IP.'
-                : 'All requests will go to the live production server.',
+                : 'All requests go to the Production URL. Both URLs are '
+                      'editable and saved; the toggle chooses which is used.',
             style: theme.textTheme.bodySmall,
           ),
           const SizedBox(height: AppSpacing.sm),
@@ -367,7 +398,11 @@ class _ServerSettingsDialogState extends State<_ServerSettingsDialog> {
         FilledButton(
           onPressed: () => Navigator.pop(
             context,
-            ServerSettings(mode: _mode, devBaseUrl: _devUrl.text.trim()),
+            ServerSettings(
+              mode: _mode,
+              devBaseUrl: _devUrl.text.trim(),
+              prodBaseUrl: _prodUrl.text.trim(),
+            ),
           ),
           child: const Text('Save'),
         ),
