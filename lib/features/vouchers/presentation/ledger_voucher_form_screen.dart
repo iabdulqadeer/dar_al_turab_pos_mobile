@@ -161,7 +161,15 @@ class _LedgerVoucherFormScreenState
             label: 'Transaction Type',
             value: _transactionType,
             items: const ['debit', 'credit'],
-            labelFor: (v) => v[0].toUpperCase() + v.substring(1),
+            // Create shows normal labels. Edit relabels the options — value
+            // 'debit' reads "Credit", 'credit' reads "Debit" — so they line up
+            // with the swapped label the list/view show. The submitted value
+            // (_transactionType) is never changed by this; this is deliberately
+            // NOT the shared display-swap helper (Ledger_payment_voucher_issues
+            // §2 vs §1).
+            labelFor: (v) => widget.isEdit
+                ? (v == 'debit' ? 'Credit' : 'Debit')
+                : v[0].toUpperCase() + v.substring(1),
             onChanged: (v) => setState(() => _transactionType = v),
           ),
           const SizedBox(height: AppSpacing.md),

@@ -20,6 +20,25 @@ enum VoucherType {
   String get personType => this == VoucherType.crv ? 'Customer' : 'Supplier';
 }
 
+/// The Debit/Credit label shown for a Ledger Payment Voucher in the **list and
+/// the view** — deliberately the opposite of the stored `transaction_type` (a
+/// business display rule): a stored `credit` reads as "Debit", `debit` as
+/// "Credit".
+///
+/// This is a post-hoc *display* swap and must NOT be reused for the edit form,
+/// which relabels its dropdown options while keeping the submitted value
+/// untouched (see Ledger_payment_voucher_issues.md §2).
+String ledgerListViewTransactionLabel(String transactionType) {
+  switch (transactionType.toLowerCase()) {
+    case 'credit':
+      return 'Debit';
+    case 'debit':
+      return 'Credit';
+    default:
+      return transactionType;
+  }
+}
+
 /// The party a voucher is for — a Customer (CRV) or Supplier (CPV/LPV).
 class VoucherPerson {
   const VoucherPerson({

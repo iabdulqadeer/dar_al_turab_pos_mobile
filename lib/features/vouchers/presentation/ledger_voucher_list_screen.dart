@@ -131,15 +131,11 @@ class _LedgerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Issue 3 (list only): the displayed label is swapped — a stored "credit"
-    // shows as Debit and a stored "debit" shows as Credit. The colour follows
-    // the label shown here, not the stored value. The form is untouched.
-    final stored = voucher.transactionType.toLowerCase();
-    final displayLabel = stored == 'credit'
-        ? 'Debit'
-        : stored == 'debit'
-            ? 'Credit'
-            : voucher.transactionType;
+    // List shows the swapped label (stored credit -> Debit, debit -> Credit),
+    // shared with View. The colour follows the label shown here; the form is
+    // untouched.
+    final displayLabel =
+        ledgerListViewTransactionLabel(voucher.transactionType);
     final displayIsDebit = displayLabel == 'Debit';
     final personType = voucher.person?.type;
 

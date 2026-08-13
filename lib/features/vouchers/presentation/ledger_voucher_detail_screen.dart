@@ -7,8 +7,8 @@ import 'widgets/voucher_detail_widgets.dart';
 /// Read-only view of a Ledger Payment Voucher. LPV isn't tied to invoices, so
 /// this is just the voucher's own fields (no Invoice Payments section).
 ///
-/// The Debit/Credit swap in Issue 3 is explicitly "list only" — this detail
-/// shows the real [LedgerPaymentVoucher.transactionType], same as the form.
+/// Per Ledger_payment_voucher_issues.md §1, View shows the same swapped
+/// Debit/Credit label as the list (stored credit -> Debit, debit -> Credit).
 class LedgerVoucherDetailScreen extends StatelessWidget {
   const LedgerVoucherDetailScreen({required this.voucher, super.key});
 
@@ -19,7 +19,7 @@ class LedgerVoucherDetailScreen extends StatelessWidget {
     final v = voucher;
     final txn = v.transactionType.isEmpty
         ? '—'
-        : v.transactionType[0].toUpperCase() + v.transactionType.substring(1);
+        : ledgerListViewTransactionLabel(v.transactionType);
 
     return Scaffold(
       appBar: AppBar(title: Text(v.voucherNo)),
