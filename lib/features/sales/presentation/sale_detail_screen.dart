@@ -22,9 +22,18 @@ import 'widgets/add_payment_sheet.dart';
 import 'widgets/status_chip.dart';
 
 class SaleDetailScreen extends ConsumerStatefulWidget {
-  const SaleDetailScreen({required this.saleId, super.key});
+  const SaleDetailScreen({
+    required this.saleId,
+    this.autoOpenPreview = false,
+    super.key,
+  });
 
   final int saleId;
+
+  /// When true (set by POS "Save & Print"), the receipt preview opens
+  /// automatically once the detail is on screen — the cashier gets the
+  /// copy-selection preview instead of the sheet printing immediately.
+  final bool autoOpenPreview;
 
   @override
   ConsumerState<SaleDetailScreen> createState() => _SaleDetailScreenState();
@@ -32,6 +41,16 @@ class SaleDetailScreen extends ConsumerStatefulWidget {
 
 class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
   bool _printing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoOpenPreview) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openPreview();
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

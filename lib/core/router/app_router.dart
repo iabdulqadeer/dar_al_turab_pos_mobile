@@ -145,7 +145,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                           message: 'That sale reference is not valid.',
                         );
                       }
-                      return SaleDetailScreen(saleId: id);
+                      // Save & Print lands here with extra {'print': true} so the
+                      // detail auto-opens the receipt preview (copy checkboxes)
+                      // instead of the sheet printing immediately.
+                      final extra = state.extra;
+                      final autoPreview =
+                          extra is Map && extra['print'] == true;
+                      return SaleDetailScreen(
+                        saleId: id,
+                        autoOpenPreview: autoPreview,
+                      );
                     },
                     routes: [
                       GoRoute(

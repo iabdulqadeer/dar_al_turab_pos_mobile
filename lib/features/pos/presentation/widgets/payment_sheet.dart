@@ -10,8 +10,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_message.dart';
 import '../../../../data/models/catalogue.dart';
 import '../../../../data/models/sale_status.dart';
-import '../../../printing/printer_transport.dart';
-import '../../../printing/providers/print_job_providers.dart';
 import '../../providers/pos_providers.dart';
 
 /// Takes payment and submits the sale.
@@ -438,19 +436,6 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
         bankId: _isDue ? null : (_isDeposit ? _bankId : null),
       );
 
-      // Save & Print: print the fresh sale before leaving. Best-effort so a
-      // print failure warns but never rolls back the saved sale.
-      String? printWarning;
-      if (print) {
-        try {
-          await ref.read(printSaleReceiptProvider)(sale.id);
-        } on PrintException catch (e) {
-          printWarning = 'Saved, but printing failed: ${e.message} ${e.remedy}';
-        } on ApiException catch (e) {
-          printWarning = 'Saved, but printing failed: ${e.message}';
-        }
-      }
-
       ref.read(cartProvider.notifier).clearLines();
 
       if (!mounted) return;
@@ -458,10 +443,8 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
       // visible over the sheet and through the navigation that follows.
       showAppMessage(
         context,
-        printWarning ?? 'Sale ${sale.referenceNo} created.',
-        kind: printWarning != null
-            ? AppMessageKind.warning
-            : AppMessageKind.success,
+        'Sale ${sale.referenceNo} created.',
+        kind: AppMessageKind.success,
       );
       // Capture the router before popping the sheet, then replace the POS
       // screen with the sale detail so "back" returns to the shell rather than
@@ -469,7 +452,13 @@ class _PaymentSheetState extends ConsumerState<PaymentSheet> {
       // not rebuild the shell.
       final router = GoRouter.of(context);
       Navigator.pop(context);
-      router.pushReplacement('${Routes.sales}/${sale.id}');
+      // Save & Print passes the flag so the sale detail auto-opens the receipt
+      // preview (copy checkboxes) rather than printing immediately
+      // (flutter_app_issues_aug_23 #1). Plain Save just shows the detail.
+      router.pushReplacement(
+        '${Routes.sales}/${sale.id}',
+        extra: print ? const {'print': true} : null,
+      );
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
