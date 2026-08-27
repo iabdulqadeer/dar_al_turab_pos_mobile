@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import '../../data/models/receipt.dart';
 import 'escpos_encoder.dart';
 import 'printer_transport.dart';
+import 'raster_encoder.dart';
 
 /// Outcome of a print attempt, including any non-fatal warning worth showing.
 class PrintOutcome {
@@ -98,6 +102,31 @@ class ReceiptPrinter {
     );
 
     return PrintOutcome(copies: copies);
+  }
+
+  /// Prints one or more rasterised invoice pages (bitmaps) as ESC/POS raster
+  /// images, so the paper reproduces the web invoice exactly (borders, tables,
+  /// fonts) rather than a monospace approximation.
+  Future<void> printImages(List<ui.Image> images) async {
+    if (images.isEmpty) {
+      throw const PrintException(
+        PrintFailure.unknown,
+        'Nothing selected to print.',
+      );
+    }
+    if (!await _transport.isConnected) {
+      throw const PrintException(
+        PrintFailure.notConnected,
+        'No printer is connected.',
+      );
+    }
+
+    const raster = RasterEncoder();
+    final out = BytesBuilder();
+    for (final image in images) {
+      out.add(await raster.encode(image));
+    }
+    await _transport.write(out.toBytes());
   }
 
   Future<void> _printLines(

@@ -17,7 +17,7 @@ import '../../printing/printer_transport.dart';
 import '../../printing/providers/print_job_providers.dart';
 import '../../printing/providers/printer_providers.dart';
 import '../providers/sales_providers.dart';
-import 'receipt_preview_screen.dart';
+import '../../printing/presentation/invoice_print_screen.dart';
 import 'widgets/add_payment_sheet.dart';
 import 'widgets/status_chip.dart';
 
@@ -291,7 +291,7 @@ class _SaleDetailScreenState extends ConsumerState<SaleDetailScreen> {
     }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ReceiptPreviewScreen(saleId: widget.saleId),
+        builder: (_) => InvoicePrintScreen(saleId: widget.saleId),
       ),
     );
   }
