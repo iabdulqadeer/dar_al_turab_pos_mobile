@@ -60,8 +60,8 @@ void main() {
       );
 
   testWidgets(
-    'tapping Done on the details form closes only the editor — the product '
-    'search sheet stays open (aug_23 #2 / aug_25 #1)',
+    'confirming the product details closes BOTH the editor and the product '
+    'search sheet, returning to the sale screen (2026-08-27)',
     (tester) async {
       await tester.pumpWidget(harness());
 
@@ -80,11 +80,11 @@ void main() {
       await tester.tap(find.text('Done'));
       await tester.pumpAndSettle();
 
-      // The editor is gone…
+      // Both sheets are gone: the details editor AND the product search sheet.
       expect(find.text('Done'), findsNothing);
-      // …but the product search sheet is STILL open (its header is present),
-      // so the cashier can immediately pick the next product.
-      expect(find.text('Add product'), findsOneWidget);
+      expect(find.text('Add product'), findsNothing);
+      // Back on the sale screen (the host button is visible again).
+      expect(find.text('open'), findsOneWidget);
 
       // Drain the "added to the sale" toast's auto-dismiss timer so it does
       // not outlive the test.

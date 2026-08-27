@@ -213,9 +213,8 @@ class _ProductSearchSheetState extends ConsumerState<ProductSearchSheet> {
     confirmed.taxRate = rate;
     (widget.onAddLine ?? _globalCommit)(confirmed);
 
-    // A brief confirmation over the sheet; the item also appears in the sale
-    // once the search sheet is closed. showAppMessage renders in the root
-    // overlay, so it sits above this sheet.
+    // A brief confirmation. showAppMessage renders in the root overlay, so it
+    // survives closing the sheets below.
     showAppMessage(
       context,
       existing == null
@@ -223,6 +222,12 @@ class _ProductSearchSheetState extends ConsumerState<ProductSearchSheet> {
           : '${product.name} updated',
       kind: AppMessageKind.success,
     );
+
+    // Once the product's details are confirmed, close the product-search sheet
+    // too (the details editor has already popped itself), returning the cashier
+    // to the sale screen — one product added per open of the search
+    // (product-owner request, 2026-08-27).
+    if (mounted) Navigator.pop(context);
   }
 
   CartLine? _globalExisting(CatalogueProduct product) {
