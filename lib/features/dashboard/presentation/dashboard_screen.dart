@@ -13,6 +13,7 @@ import '../../../data/models/auth_user.dart';
 import '../../../data/models/sale.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../branding/providers/branding_providers.dart';
+import '../../cash_register/presentation/cash_register_screen.dart';
 import '../../printing/providers/printer_providers.dart';
 import '../../sales/presentation/widgets/sale_row_menu.dart';
 import '../providers/dashboard_providers.dart';
@@ -39,6 +40,8 @@ class DashboardScreen extends ConsumerWidget {
     final recent = ref.watch(dashboardRecentProvider);
     final brand = ref.watch(brandingProvider);
     final canCreateSale = user?.can(Permissions.salesAdd) ?? false;
+    final canViewCashRegister =
+        user?.can(Permissions.dailyCashRegister) ?? false;
 
     // Flag a missing printer: printing is supported on this platform but no
     // printer is connected. The banner is dismissible for the session.
@@ -80,6 +83,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
               _QuickMenu(
                 canCreateSale: canCreateSale,
+                canViewCashRegister: canViewCashRegister,
                 printerConnected: printerConnected || !printingSupported,
               ),
               _RecentHeader(),
@@ -186,10 +190,12 @@ class _Greeting extends StatelessWidget {
 class _QuickMenu extends StatelessWidget {
   const _QuickMenu({
     required this.canCreateSale,
+    required this.canViewCashRegister,
     required this.printerConnected,
   });
 
   final bool canCreateSale;
+  final bool canViewCashRegister;
   final bool printerConnected;
 
   @override
@@ -216,6 +222,19 @@ class _QuickMenu extends StatelessWidget {
             subtitle: 'Browse and search past sales',
             onTap: () => context.go(Routes.sales),
           ),
+          if (canViewCashRegister)
+            _QuickTile(
+              icon: Icons.point_of_sale,
+              accent: AppColors.secondary,
+              title: 'Cash Register',
+              subtitle: 'Daily cash-in / cash-out report',
+              // Push on the branch navigator so the bottom nav stays visible.
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const CashRegisterScreen(),
+                ),
+              ),
+            ),
           _QuickTile(
             icon: Icons.print,
             accent: AppColors.success,

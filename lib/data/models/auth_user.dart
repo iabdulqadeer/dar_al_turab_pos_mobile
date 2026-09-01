@@ -85,6 +85,8 @@ abstract final class Permissions {
   // Cash Received / Cash Payment vouchers. Ledger Payment Vouchers are gated
   // by role only (any user creates; admin-only edit/delete), no permission
   // string — see the vouchers module doc §4.
+  static const dailyCashRegister = 'daily-cash-register-report';
+
   static const cashReceivedVoucher = 'cash-received-voucher';
   static const cashPaymentVoucher = 'cash-payment-voucher';
   static const addCashVoucher = 'add-cash-voucher';
